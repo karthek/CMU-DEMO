@@ -1,12 +1,10 @@
 from travel_agent.coordinator import TravelCoordinator
-from travel_agent.providers.mock_provider import MockProvider
 from travel_agent.tools.flight_tool import FakeFlightTool
 from travel_agent.tools.calendar_tool import FakeCalendarTool
 from travel_agent.planning.beam_search import BeamSearchPlanner
 
 def main():
     coordinator = TravelCoordinator(
-        provider=MockProvider(),
         flight_tool=FakeFlightTool(),
         calendar_tool=FakeCalendarTool(),
         planner=BeamSearchPlanner(beam_width=2, depth=3),
