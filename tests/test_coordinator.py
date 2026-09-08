@@ -27,13 +27,13 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(MockProvider().generate_candidate_plans(context), plans)
         self.assertEqual(MockProvider().generate_candidate_plans(context, 2), plans[:2])
 
-    def test_v1_recommendation_and_duplicate_finalists_are_preserved(self):
+    def test_v6_recommendation_and_distinct_finalists(self):
         result = self.coordinator.plan_trip("DL1425", "2026-09-11")
         self.assertEqual(result["recommendation"],
-            "Leave at 16:15 for flight DL1425. Selected 'Balanced / later / earlier' "
-            "with score 76.40. The planner balanced airport buffer against workday impact.")
+            "Leave at 16:25 for flight DL1425. Selected 'Balanced / later' "
+            "with score 77.20. The planner balanced airport buffer against workday impact.")
         self.assertEqual([p["leave_time"] for p in result["finalists"]],
-                         ["2026-09-11T16:15", "2026-09-11T16:15"])
+                         ["2026-09-11T16:25", "2026-09-11T16:15"])
         context = self.coordinator.get_trip_context("DL1425", "2026-09-11")
         self.assertEqual(MockProvider().summarize_recommendation(context, result["finalists"]),
                          result["recommendation"])
@@ -54,4 +54,4 @@ runpy.run_module("app", run_name="__main__")
                                 cwd=Path(__file__).resolve().parents[1],
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Leave at 16:15", result.stdout)
+        self.assertIn("Leave at 16:25", result.stdout)

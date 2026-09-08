@@ -126,7 +126,7 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(baseline.structured_content, make_service().evaluate_trip_plans(context))
                 selected = baseline.structured_content["selected_plan"]
                 self.assertEqual((selected["leave_time"], selected["score"]),
-                                 ("2026-09-11T16:15", 76.4))
+                                 ("2026-09-11T16:25", 77.2))
                 explicit_null = await client.call_tool("evaluate_trip_plans", {
                     "context": context, "candidates": None,
                 })
@@ -167,7 +167,7 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                 # A malformed call must not take down the server.
                 recovered = await client.call_tool("evaluate_trip_plans", {"context": context})
                 self.assertEqual(recovered.structured_content, baseline.structured_content)
-                print("\nMCP stdio verified: 2 tools; context retrieved; baseline 16:15 / 76.40; "
+                print("\nMCP stdio verified: 2 tools; context retrieved; baseline 16:25 / 77.20; "
                       "host-assisted 16:20 / 76.80; forged scores ignored; "
                       "6 malformed calls sanitized; server recovered.")
 
@@ -175,7 +175,7 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
 class OptionalDependencyTests(unittest.TestCase):
     def test_both_demos_work_without_site_packages(self):
         # -S removes site-packages, so neither MCP nor its dependencies are available.
-        for filename, expected in [("app.py", "76.40"), ("host_assisted_demo.py", "76.80")]:
+        for filename, expected in [("app.py", "77.20"), ("host_assisted_demo.py", "76.80")]:
             with self.subTest(filename=filename):
                 result = subprocess.run(
                     [sys.executable, "-B", "-S", filename], cwd=ROOT,

@@ -35,8 +35,8 @@ class ServiceTests(unittest.TestCase):
         result = self.service.evaluate_trip_plans(self.context)
         self.assertEqual(result, self.service.evaluate_trip_plans(self.context, None))
         self.assertEqual(result["mode"], "deterministic")
-        self.assertEqual(result["selected_plan"]["leave_time"], "2026-09-11T16:15")
-        self.assertEqual(result["selected_plan"]["score"], 76.4)
+        self.assertEqual(result["selected_plan"]["leave_time"], "2026-09-11T16:25")
+        self.assertEqual(result["selected_plan"]["score"], 77.2)
 
     def test_host_candidates_use_same_planner_without_baseline(self):
         with patch("travel_agent.coordinator.generate_baseline_candidates") as baseline:
@@ -61,7 +61,7 @@ class ServiceTests(unittest.TestCase):
     def test_history_is_optional(self):
         del self.candidates[0]["history"]
         result = self.service.evaluate_trip_plans(self.context, self.candidates)
-        self.assertEqual(len(result["selected_plan"]["history"]), 2)
+        self.assertEqual(len(result["selected_plan"]["history"]), 0)
 
     def test_bad_candidate_inputs_fail_before_search(self):
         invalid = [[], {}, "plans", [None]]

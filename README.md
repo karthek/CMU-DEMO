@@ -1,14 +1,19 @@
-# Model-Agnostic Travel Agent — V5
+# Model-Agnostic Travel Agent — V6
+
+V6 corrects Beam Search by preserving parents and deduplicating leave times.
+The verified deterministic finalists are 16:25 / 77.20 and 16:15 / 76.40.
+See [V6 search behavior and trace](V6_SEARCH.md). The `v5` tag remains the historical
+reference; its documentation and scoring rules are unchanged.
 
 V5 wires the independent V4 Flight, Calendar, and Transport agents into the active
 Coordinator. Both demos and the MCP server use the shared simulated composition
-factory. The service/MCP contracts, Beam Search, Critic, and baseline results are
-preserved. See [V5 orchestration](V5_ORCHESTRATION.md) for exact mappings, structured
+factory. V6 preserves the service/MCP contracts, Critic, and agent mappings.
+See [V5 orchestration](V5_ORCHESTRATION.md) for the historical mappings, structured
 error propagation, and transport components intentionally excluded from scoring.
 
 This CMU capstone prototype exposes a model-independent travel-planning core.
 It uses only the Python standard library, fake flight/calendar data, and the
-existing V1 Beam Search and Critic. No API key or model SDK is required.
+V6 Beam Search and original Critic. No API key or model SDK is required.
 V3 adds an optional local MCP stdio adapter; standalone operation still requires
 only the standard library.
 
@@ -30,8 +35,8 @@ python app.py
 ```
 
 On Windows, activation is optional: use `.venv\Scripts\python.exe -B app.py`.
-The demo preserves the V1 recommendation: 16:15, score 76.40, with two duplicate
-finalists. Beam width remains 2 and depth remains 3 (two refinement rounds).
+The demo recommends 16:25, score 77.20, with a distinct 16:15 / 76.40 alternative.
+Beam width remains 2 and depth remains 3 (two refinement rounds).
 
 ## Service boundary
 
@@ -196,7 +201,7 @@ runnable without installing it.
 
 ## Boundaries and future work
 
-- Beam Search and Critic are unchanged, including duplicate finalists and pruning behavior.
+- V6 Beam Search preserves parents and distinct leave times; Critic scoring is unchanged.
 - V3 provides local MCP stdio only: no HTTP transport or real AI host is configured yet.
 - MCP/host adapters wrap `TravelService`; optional standalone model
   adapters should generate candidates outside the core and use environment-based credentials.

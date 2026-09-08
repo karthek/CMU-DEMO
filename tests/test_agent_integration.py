@@ -69,7 +69,7 @@ class AgentIntegrationTests(unittest.TestCase):
         self.assertEqual((context.airport_travel_minutes, context.security_minutes, context.gate_walk_minutes),
                          (45, 20, 15))
         result = self.coordinator.evaluate_trip_plans(context)
-        self.assertEqual(result["selected_plan"]["score"], 76.4)
+        self.assertEqual(result["selected_plan"]["score"], 77.2)
 
     def test_changed_transport_tool_duration_reaches_context(self):
         tool = Mock(spec=FakeTransportTool)
@@ -162,7 +162,7 @@ class AgentIntegrationTests(unittest.TestCase):
         self.assertIsInstance(coordinator.flight_agent, FlightAgent)
         self.assertIsInstance(coordinator.calendar_agent, CalendarAgent)
         self.assertIsInstance(coordinator.transport_agent, TransportAgent)
-        self.assertEqual(coordinator.plan_trip("DL1425", "2026-09-11")["selected_plan"]["score"], 76.4)
+        self.assertEqual(coordinator.plan_trip("DL1425", "2026-09-11")["selected_plan"]["score"], 77.2)
 
     def test_agent_constructor_requires_explicit_transport(self):
         with self.assertRaises(TypeError):
@@ -173,7 +173,7 @@ class AgentIntegrationTests(unittest.TestCase):
         context = service.get_trip_context("DL1425", "2026-09-11")
         baseline = service.evaluate_trip_plans(context)
         self.assertEqual((baseline["selected_plan"]["leave_time"], baseline["selected_plan"]["score"]),
-                         ("2026-09-11T16:15", 76.4))
+                         ("2026-09-11T16:25", 77.2))
         candidates = [{"label": label, "leave_time": f"2026-09-11T{time}",
                        "summary": "Host proposal", "history": [], "score": 999999}
                       for label, time in [("Host early", "15:50"), ("Host buffer", "16:20"), ("Host meeting", "17:00")]]
