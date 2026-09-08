@@ -1,6 +1,14 @@
 from dataclasses import dataclass, field
 from typing import List
 
+@dataclass(frozen=True)
+class TransportEstimate:
+    travel_minutes: int
+    parking_minutes: int
+    terminal_walk_minutes: int
+    mode: str
+    source: str
+
 @dataclass
 class FlightState:
     flight_number: str
