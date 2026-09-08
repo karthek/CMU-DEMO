@@ -17,11 +17,9 @@ from mcp.types import (
     ToolAnnotations,
 )
 
-from travel_agent.coordinator import TravelCoordinator
-from travel_agent.planning.beam_search import BeamSearchPlanner
+from travel_agent.agents.errors import InvalidInputError
+from travel_agent.composition import create_simulated_coordinator
 from travel_agent.service import TravelService
-from travel_agent.tools.calendar_tool import FakeCalendarTool
-from travel_agent.tools.flight_tool import FakeFlightTool
 
 
 READ_ONLY = ToolAnnotations(
@@ -128,11 +126,7 @@ def _error(code: str, message: str) -> CallToolResult:
 
 def create_server(service: TravelService | None = None) -> Server:
     if service is None:
-        service = TravelService(TravelCoordinator(
-            flight_tool=FakeFlightTool(),
-            calendar_tool=FakeCalendarTool(),
-            planner=BeamSearchPlanner(beam_width=2, depth=3),
-        ))
+        service = TravelService(create_simulated_coordinator())
     tools = {tool.name: tool for tool in TOOLS}
     validators = {name: Draft202012Validator(tool.input_schema) for name, tool in tools.items()}
 
@@ -158,7 +152,7 @@ def create_server(service: TravelService | None = None) -> Server:
             else:
                 data = service.evaluate_trip_plans(**arguments)
             return _result(data)
-        except ValueError:
+        except (ValueError, InvalidInputError):
             return _error("INVALID_INPUT", invalid_message)
         except Exception:
             # Never return exception text, input values, file paths, or tracebacks.

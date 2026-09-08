@@ -1,17 +1,10 @@
 """Simulate host tool calls locally, without a model SDK or MCP transport."""
-from travel_agent.coordinator import TravelCoordinator
-from travel_agent.planning.beam_search import BeamSearchPlanner
+from travel_agent.composition import create_simulated_coordinator
 from travel_agent.service import TravelService
-from travel_agent.tools.calendar_tool import FakeCalendarTool
-from travel_agent.tools.flight_tool import FakeFlightTool
 
 
 def main():
-    service = TravelService(TravelCoordinator(
-        flight_tool=FakeFlightTool(),
-        calendar_tool=FakeCalendarTool(),
-        planner=BeamSearchPlanner(beam_width=2, depth=3),
-    ))
+    service = TravelService(create_simulated_coordinator())
     context = service.get_trip_context("DL1425", "2026-09-11")
     candidates = [
         {

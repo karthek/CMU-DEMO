@@ -1,4 +1,10 @@
-# Model-Agnostic Travel Agent — V3
+# Model-Agnostic Travel Agent — V5
+
+V5 wires the independent V4 Flight, Calendar, and Transport agents into the active
+Coordinator. Both demos and the MCP server use the shared simulated composition
+factory. The service/MCP contracts, Beam Search, Critic, and baseline results are
+preserved. See [V5 orchestration](V5_ORCHESTRATION.md) for exact mappings, structured
+error propagation, and transport components intentionally excluded from scoring.
 
 This CMU capstone prototype exposes a model-independent travel-planning core.
 It uses only the Python standard library, fake flight/calendar data, and the

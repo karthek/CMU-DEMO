@@ -1,14 +1,7 @@
-from travel_agent.coordinator import TravelCoordinator
-from travel_agent.tools.flight_tool import FakeFlightTool
-from travel_agent.tools.calendar_tool import FakeCalendarTool
-from travel_agent.planning.beam_search import BeamSearchPlanner
+from travel_agent.composition import create_simulated_coordinator
 
 def main():
-    coordinator = TravelCoordinator(
-        flight_tool=FakeFlightTool(),
-        calendar_tool=FakeCalendarTool(),
-        planner=BeamSearchPlanner(beam_width=2, depth=3),
-    )
+    coordinator = create_simulated_coordinator()
 
     result = coordinator.plan_trip(
         flight_number="DL1425",
