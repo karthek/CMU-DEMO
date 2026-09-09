@@ -1,4 +1,20 @@
-# Model-Agnostic Travel Agent - V7
+# Model-Agnostic Travel Agent - V8
+
+V8 adds fixture-backed itinerary monitoring, SQLite attempt history, automatic
+T-24h activation, and independent user-requested planning on
+`feature/v8-itinerary-monitoring`. It reuses the frozen V7 planning core.
+See [V8_ITINERARY_MONITORING.md](V8_ITINERARY_MONITORING.md) for ownership,
+clock convention, persistence, lifecycle, fixtures, and verification.
+
+The current MCP server exposes exactly **four** tools: `get_trip_context`,
+`evaluate_trip_plans`, `monitor_trips`, and `plan_booked_trip`. The first two retain
+their V7 schemas. V8 needs `pip install -r requirements.txt` for portable timezone
+data. Existing V7-only demos retain their standard-library behavior.
+
+## Historical V7 and earlier baseline
+
+The sections below describe the earlier versions, including their original tool
+counts and deferred features. The V8 document above describes the current additions.
 
 V7 separates hard gate feasibility from the unchanged Critic preference score.
 Only feasible plans can be recommended; bounded search can return

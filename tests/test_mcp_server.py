@@ -53,18 +53,18 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
         for forbidden in ("Traceback", "ValueError", "RuntimeError", "private-marker", str(ROOT)):
             self.assertNotIn(forbidden, wire_text)
 
-    async def test_discovery_exposes_only_two_described_read_only_tools(self):
+    async def test_discovery_exposes_four_tools_preserving_v7_annotations(self):
         async with Client(create_server()) as client:
             result = await client.list_tools()
         tools = {tool.name: tool for tool in result.tools}
-        self.assertEqual(set(tools), {"get_trip_context", "evaluate_trip_plans"})
+        self.assertEqual(set(tools), {"get_trip_context", "evaluate_trip_plans", "monitor_trips", "plan_booked_trip"})
         self.assertEqual(tools["get_trip_context"].input_schema["required"],
                          ["flight_number", "date"])
         self.assertEqual(tools["evaluate_trip_plans"].input_schema["required"], ["context"])
         self.assertIn("candidates", tools["evaluate_trip_plans"].input_schema["properties"])
         for tool in tools.values():
             self.assertTrue(tool.description)
-            self.assertTrue(tool.annotations.read_only_hint)
+            self.assertEqual(tool.annotations.read_only_hint, tool.name in ("get_trip_context", "evaluate_trip_plans"))
             self.assertFalse(tool.annotations.destructive_hint)
             self.assertIsNotNone(tool.output_schema)
 
@@ -115,7 +115,7 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
             async with Client(params, read_timeout_seconds=15) as client:
                 tools = await client.list_tools()
                 self.assertEqual({t.name for t in tools.tools},
-                                 {"get_trip_context", "evaluate_trip_plans"})
+                                 {"get_trip_context", "evaluate_trip_plans", "monitor_trips", "plan_booked_trip"})
                 context_result = await client.call_tool("get_trip_context", {
                     "flight_number": "DL1425", "date": "2026-09-11",
                 })
@@ -189,7 +189,7 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                 # A malformed call must not take down the server.
                 recovered = await client.call_tool("evaluate_trip_plans", {"context": context})
                 self.assertEqual(recovered.structured_content, baseline.structured_content)
-                print("\nMCP stdio verified: 2 tools; context retrieved; baseline 16:25 / 77.20; "
+                print("\nMCP stdio verified: 4 tools; context retrieved; baseline 16:25 / 77.20; "
                       "host-assisted 16:20 / 76.80; forged evaluations ignored; "
                       "all-infeasible NO_FEASIBLE_PLAN (isError=false, selected=null); "
                       "6 malformed calls sanitized; server recovered.")

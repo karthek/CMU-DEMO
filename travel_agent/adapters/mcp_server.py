@@ -117,6 +117,25 @@ TOOLS = (
 )
 
 
+from travel_agent.adapters.itinerary_schemas import MONITOR_INPUT, schemas
+
+_manual_input, _monitor_output, _manual_output = schemas(CANDIDATE_SCHEMA, CONTEXT_SCHEMA, TOOLS[1].output_schema)
+TOOLS += (
+    Tool(name="monitor_trips", description=(
+        "Refresh simulated booked itineraries and automatically plan every eligible segment. "
+        "The service clock supplies current time. Persists local history; completed automatic runs are suppressed. "
+        "No scheduler, notification, calendar write, or booking action."),
+        input_schema=MONITOR_INPUT, output_schema=_monitor_output,
+        annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)),
+    Tool(name="plan_booked_trip", description=(
+        "Plan or replan an upcoming booked segment on explicit user request. Refresh and resolve selector first. "
+        "Bypasses only automatic lead time; preserves V7 feasibility and scoring. Multiple matches require selection. "
+        "Persists local attempt history without consuming the automatic trigger. No calendar or booking writes."),
+        input_schema=_manual_input, output_schema=_manual_output,
+        annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)),
+)
+
+
 def _result(data: dict, *, is_error: bool = False) -> CallToolResult:
     return CallToolResult(
         content=[TextContent(type="text", text=json.dumps(data, allow_nan=False))],
@@ -129,7 +148,7 @@ def _error(code: str, message: str) -> CallToolResult:
     return _result({"error": {"code": code, "message": message}}, is_error=True)
 
 
-def create_server(service: TravelService | None = None) -> Server:
+def create_server(service: TravelService | None = None, *, itinerary_service=None) -> Server:
     if service is None:
         service = TravelService(create_simulated_coordinator())
     tools = {tool.name: tool for tool in TOOLS}
@@ -139,6 +158,7 @@ def create_server(service: TravelService | None = None) -> Server:
         return ListToolsResult(tools=list(TOOLS))
 
     async def call_tool(ctx: ServerRequestContext, params: CallToolRequestParams) -> CallToolResult:
+        nonlocal itinerary_service
         if params.name not in tools:
             return _error("UNKNOWN_TOOL", "Choose a tool returned by tools/list.")
         arguments = params.arguments if params.arguments is not None else {}
@@ -148,14 +168,21 @@ def create_server(service: TravelService | None = None) -> Server:
             "Provide a valid trip context and omit candidates or supply a non-empty "
             "list of plans with label, local ISO leave_time, summary, and optional string-list history."
         )
+        if params.name in ("monitor_trips", "plan_booked_trip"):
+            invalid_message = "Provide an empty monitor input or a valid booked-trip selector and optional candidate proposals."
         try:
             # The low-level SDK advertises schemas but leaves argument validation to us.
             if not validators[params.name].is_valid(arguments):
                 return _error("INVALID_INPUT", invalid_message)
             if params.name == "get_trip_context":
                 data = service.get_trip_context(**arguments)
-            else:
+            elif params.name == "evaluate_trip_plans":
                 data = service.evaluate_trip_plans(**arguments)
+            else:
+                if itinerary_service is None:
+                    from travel_agent.composition import create_itinerary_service
+                    itinerary_service = create_itinerary_service()
+                data = getattr(itinerary_service, params.name)(**arguments)
             return _result(data)
         except (ValueError, InvalidInputError):
             return _error("INVALID_INPUT", invalid_message)
@@ -164,10 +191,11 @@ def create_server(service: TravelService | None = None) -> Server:
             return _error("INTERNAL_ERROR", "The travel service could not complete this request.")
 
     return Server(
-        "Travel Agent", version="3.0.0",
+        "Travel Agent", version="8.0.0",
         instructions=(
-            "Local travel-planning prototype using simulated data. Retrieve context, "
-            "then evaluate plans. The host owns conversation and model inference."
+            "Local simulated travel planning. monitor_trips uses the service clock for automatic activation; "
+            "plan_booked_trip is for explicit user requests. Existing context/evaluation tools remain available. "
+            "The host owns conversation and model inference; Python owns validation and planning decisions."
         ),
         on_list_tools=list_tools, on_call_tool=call_tool,
     )
