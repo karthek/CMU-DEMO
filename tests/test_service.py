@@ -74,7 +74,7 @@ class ServiceTests(unittest.TestCase):
             plan = dict(self.candidates[0])
             plan[field] = value
             invalid.append([plan])
-        with patch.object(self.planner, "search") as search:
+        with patch.object(self.planner, "search_outcome") as search:
             for candidates in invalid:
                 with self.subTest(candidates=candidates), self.assertRaises(ValueError):
                     self.service.evaluate_trip_plans(self.context, candidates)
@@ -97,7 +97,7 @@ class ServiceTests(unittest.TestCase):
         context = copy.deepcopy(self.context)
         context["calendar_events"][0]["end"] = "2026-09-11T13:00"
         invalid.append(context)
-        with patch.object(self.planner, "search") as search:
+        with patch.object(self.planner, "search_outcome") as search:
             for context in invalid:
                 with self.subTest(context=context), self.assertRaises(ValueError):
                     self.service.evaluate_trip_plans(context)

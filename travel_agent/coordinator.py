@@ -72,18 +72,21 @@ class TravelCoordinator:
         if candidates is None:
             candidates = generate_baseline_candidates(context)
         candidates = validate_candidates(candidates)
-        finalists = self.planner.search(context, candidates)
+        outcome = self.planner.search_outcome(context, candidates)
+        finalists = outcome.finalists
 
         recommendation = summarize_recommendation(
             context=context,
             finalists=finalists,
-        )
+        ) if finalists else "No feasible plan was found within the explored candidates."
 
         return {
+            "status": "PLAN_FOUND" if finalists else "NO_FEASIBLE_PLAN",
             "mode": mode,
-            "selected_plan": finalists[0],
+            "selected_plan": finalists[0] if finalists else None,
             "recommendation": recommendation,
             "finalists": finalists,
+            "diagnostics": outcome.diagnostics,
         }
 
     def plan_trip(self, flight_number: str, date: str, candidates=None) -> dict:

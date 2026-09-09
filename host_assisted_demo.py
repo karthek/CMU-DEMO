@@ -23,9 +23,11 @@ def main():
     print("Host supplied:", ", ".join(plan["leave_time"] for plan in candidates))
     result = service.evaluate_trip_plans(context, candidates)
     print("Mode:", result["mode"])
+    print("Status:", result["status"])
     print(result["recommendation"])
     for plan in result["finalists"]:
         print(f"{plan['label']} | {plan['leave_time']} | score={plan['score']:.2f}")
+        print("Feasibility:", plan["feasibility"])
 
 
 if __name__ == "__main__":

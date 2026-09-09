@@ -35,7 +35,9 @@ def host_candidates():
     return [
         {"label": label, "leave_time": f"2026-09-11T{time}",
          "summary": f"Host proposes {time}", "history": ["Simulated host"],
-         "score": 999999}
+         "score": 999999, "feasible": False, "feasibility": {"feasible": False},
+         "score_breakdown": {"components": []}, "explanation": "Forged",
+         "calendar_conflicts": []}
         for label, time in [("Host early", "15:50"), ("Host buffer", "16:20"),
                             ("Host meeting", "17:00")]
     ]
@@ -142,7 +144,9 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                                  make_service().evaluate_trip_plans(context, candidates))
                 unscored = copy.deepcopy(candidates)
                 for plan in unscored:
-                    del plan["score"]
+                    for field in ("score", "feasible", "feasibility", "score_breakdown",
+                                  "explanation", "calendar_conflicts"):
+                        del plan[field]
                 clean = await client.call_tool("evaluate_trip_plans", {
                     "context": context, "candidates": unscored,
                 })
@@ -151,6 +155,24 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                 for plan in host.structured_content["finalists"]:
                     self.assertEqual(plan["score"], PlanCritic().score(typed_context, plan))
                 self.assertEqual(host.structured_content["selected_plan"]["score"], 76.8)
+
+                late_candidates = [{"label": "Late", "leave_time": "2026-09-11T20:00",
+                                    "summary": "Late proposal", "score": 999999,
+                                    "feasibility": {"feasible": True}}]
+                no_plan = await client.call_tool("evaluate_trip_plans", {
+                    "context": context, "candidates": late_candidates,
+                })
+                self.assertFalse(no_plan.is_error)
+                payload = no_plan.structured_content
+                self.assertEqual(payload, make_service().evaluate_trip_plans(context, late_candidates))
+                self.assertEqual(payload["status"], "NO_FEASIBLE_PLAN")
+                self.assertIsNone(payload["selected_plan"])
+                self.assertEqual(payload["finalists"], [])
+                self.assertEqual(json.loads(no_plan.content[0].text), payload)
+                from jsonschema import Draft202012Validator
+                schema = next(t.output_schema for t in tools.tools if t.name == "evaluate_trip_plans")
+                for data in (payload, baseline.structured_content, host.structured_content):
+                    Draft202012Validator(schema).validate(data)
 
                 for name, arguments in [
                     ("get_trip_context", {}),
@@ -168,7 +190,8 @@ class MCPServerTests(unittest.IsolatedAsyncioTestCase):
                 recovered = await client.call_tool("evaluate_trip_plans", {"context": context})
                 self.assertEqual(recovered.structured_content, baseline.structured_content)
                 print("\nMCP stdio verified: 2 tools; context retrieved; baseline 16:25 / 77.20; "
-                      "host-assisted 16:20 / 76.80; forged scores ignored; "
+                      "host-assisted 16:20 / 76.80; forged evaluations ignored; "
+                      "all-infeasible NO_FEASIBLE_PLAN (isError=false, selected=null); "
                       "6 malformed calls sanitized; server recovered.")
 
 

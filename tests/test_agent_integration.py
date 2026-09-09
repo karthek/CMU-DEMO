@@ -48,7 +48,7 @@ class AgentIntegrationTests(unittest.TestCase):
             call.flight.get_flight("DL1425", "2026-09-11"),
             call.calendar.get_events("2026-09-11"), call.transport.get_estimate(),
         ])
-        self.planner.search.assert_not_called()
+        self.planner.search_outcome.assert_not_called()
 
     def test_validated_agent_outputs_map_without_revalidation(self):
         with patch("travel_agent.agents._validation.timestamp", side_effect=AssertionError("duplicate validation")), \
@@ -89,7 +89,7 @@ class AgentIntegrationTests(unittest.TestCase):
                 self.assertEqual(caught.exception.agent, "calendar")
                 self.assertEqual(caught.exception.code, "INVALID_DATA")
         self.transport.get_estimate.assert_not_called()
-        self.planner.search.assert_not_called()
+        self.planner.search_outcome.assert_not_called()
 
     def test_real_calendar_sorting_and_priorities_reach_context(self):
         tool = Mock(spec=FakeCalendarTool)
@@ -119,7 +119,7 @@ class AgentIntegrationTests(unittest.TestCase):
                     for _, later in methods[index + 1:]:
                         later.assert_not_called()
                     method.side_effect = None
-        self.planner.search.assert_not_called()
+        self.planner.search_outcome.assert_not_called()
 
     def test_real_tool_failure_propagates_through_agent_and_service(self):
         for attribute, agent_class, tool_method in [
@@ -141,7 +141,7 @@ class AgentIntegrationTests(unittest.TestCase):
     def test_external_context_still_validated_at_service_boundary(self):
         with self.assertRaises(ValueError):
             self.service.evaluate_trip_plans({})
-        self.planner.search.assert_not_called()
+        self.planner.search_outcome.assert_not_called()
         self.flight.get_flight.assert_not_called()
 
     def test_wire_context_matches_v2_format(self):

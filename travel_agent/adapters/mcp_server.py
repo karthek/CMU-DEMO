@@ -101,11 +101,16 @@ TOOLS = (
             "type": "object",
             "properties": {
                 "mode": {"enum": ["deterministic", "host-assisted"]},
-                "selected_plan": {"type": "object"},
+                "status": {"enum": ["PLAN_FOUND", "NO_FEASIBLE_PLAN"]},
+                "selected_plan": {
+                    "type": ["object", "null"],
+                    "description": "Feasible plan with core-computed feasibility, score_breakdown and calendar_conflicts; null if bounded search found none.",
+                },
+                "diagnostics": {"type": "object", "description": "Explored-candidate scope/count; best infeasible candidate is diagnostic only."},
                 "finalists": {"type": "array", "items": {"type": "object"}},
                 "recommendation": {"type": "string"},
             },
-            "required": ["mode", "selected_plan", "finalists", "recommendation"],
+            "required": ["status", "mode", "selected_plan", "finalists", "recommendation", "diagnostics"],
         },
         annotations=READ_ONLY,
     ),

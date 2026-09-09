@@ -1,9 +1,12 @@
-# Model-Agnostic Travel Agent — V6
+# Model-Agnostic Travel Agent - V7
 
-V6 corrects Beam Search by preserving parents and deduplicating leave times.
-The verified deterministic finalists are 16:25 / 77.20 and 16:15 / 76.40.
-See [V6 search behavior and trace](V6_SEARCH.md). The `v5` tag remains the historical
-reference; its documentation and scoring rules are unchanged.
+V7 separates hard gate feasibility from the unchanged Critic preference score.
+Only feasible plans can be recommended; bounded search can return
+`NO_FEASIBLE_PLAN` with `selected_plan: null`. Every feasible finalist includes
+core-computed feasibility, an exact score breakdown, and calendar conflict records.
+See [V7 feasibility and verification](V7_FEASIBILITY.md) for policy, contracts,
+recovery behavior, test coverage, and limitations. The tagged `v6` is the stable
+historical reference; [V6 search documentation](V6_SEARCH.md) is unchanged.
 
 V5 wires the independent V4 Flight, Calendar, and Transport agents into the active
 Coordinator. Both demos and the MCP server use the shared simulated composition
@@ -13,7 +16,7 @@ error propagation, and transport components intentionally excluded from scoring.
 
 This CMU capstone prototype exposes a model-independent travel-planning core.
 It uses only the Python standard library, fake flight/calendar data, and the
-V6 Beam Search and original Critic. No API key or model SDK is required.
+V7 feasibility-first Beam Search and original Critic weights. No API key or model SDK is required.
 V3 adds an optional local MCP stdio adapter; standalone operation still requires
 only the standard library.
 
@@ -64,20 +67,24 @@ host_result = service.evaluate_trip_plans(context, candidates=[{
 
 `get_trip_context` returns a dictionary containing `flight`, `calendar_events`,
 and travel durations. `evaluate_trip_plans` returns `mode`, `selected_plan`,
-`finalists`, and a deterministic `recommendation`. A host may write its own
-explanation using the structured result.
+`finalists`, and a deterministic `recommendation`, plus V7 `status` and
+`diagnostics`. A selected plan is nullable. Feasible finalists carry `feasibility`,
+`score_breakdown`, and `calendar_conflicts`; hosts should ground explanations in
+these independently computed records.
 
 Candidates require non-empty `label`, `leave_time`, and `summary` strings.
 `history` is an optional list of strings, defaulting to an empty list. Times must
 be local ISO date/time strings without timezone offsets, matching V1. Caller
-scores and unrelated candidate fields are discarded; the Critic owns scoring.
+scores, feasibility, explanations, and unrelated candidate fields are discarded;
+the core owns feasibility and scoring.
 An empty candidate list is an error, not a request for deterministic mode.
 Malformed input raises `ValueError` before search. Inputs are copied, not mutated.
 
 The service is stateless: the evaluation call accepts caller-supplied context.
 Validation checks its structure and basic consistency, not whether its facts
-are authoritative. Feasibility remains governed by the existing Critic, including
-its limitations. No booking or calendar changes occur.
+are authoritative. Hard feasibility uses modeled gate arrival on or before
+departure minus the configured gate buffer; boarding and calendar remain soft
+preferences. No booking or calendar changes occur.
 
 Run a simulated host flow (no model/network call):
 
@@ -134,7 +141,7 @@ exactly two read-only tools with semantic descriptions and JSON input/output sch
 | Tool | Required arguments | Optional arguments | Successful structured result |
 |---|---|---|---|
 | `get_trip_context` | `flight_number`, `date` | None | The V2 context dictionary |
-| `evaluate_trip_plans` | `context` | `candidates` (omitted/null selects baseline) | The V2 planning result |
+| `evaluate_trip_plans` | `context` | `candidates` (omitted/null selects baseline) | V7 planning result, including successful `NO_FEASIBLE_PLAN` |
 
 The descriptions explain simulated data, how to chain the calls, both planning
 modes, and that the Critic computes every score. Host-provided scores are ignored
@@ -201,7 +208,9 @@ runnable without installing it.
 
 ## Boundaries and future work
 
-- V6 Beam Search preserves parents and distinct leave times; Critic scoring is unchanged.
+- V7 retains V6 parents, deduplication, width 2, depth 3, and Critic weights.
+- Gate policy defaults to 15 minutes; it is not universal airline gate-close data.
+- No feasible result means none found in the explored bounded search, not impossibility.
 - V3 provides local MCP stdio only: no HTTP transport or real AI host is configured yet.
 - MCP/host adapters wrap `TravelService`; optional standalone model
   adapters should generate candidates outside the core and use environment-based credentials.
