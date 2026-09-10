@@ -1,0 +1,31 @@
+{
+  "booking": {
+    "subject": "Northstar Air booking confirmation",
+    "text_body": "Thank you for choosing Northstar Air.\nEvent: BOOKING\nCarrier: NS\nFlight: NS123\nOrigin: ATL\nDestination: LAX\nDeparture date: 2026-09-12\nDeparture: 2026-09-12T09:00-04:00\nOrigin timezone: America/New_York\nArrival: 2026-09-12T11:00-07:00\nDestination timezone: America/Los_Angeles\nBooking reference: ABC123\nTraveler reference: TRAVELER-1\nSegment reference: COUPON-1\nPlease keep this confirmation for your records."
+  },
+  "change": {
+    "subject": "Northstar Air schedule change",
+    "text_body": "Your flight schedule has changed.\nEvent: CHANGE\nCarrier: NS\nFlight: NS123\nOrigin: ATL\nDestination: LAX\nDeparture date: 2026-09-12\nDeparture: 2026-09-12T10:00-04:00\nOrigin timezone: America/New_York\nArrival: 2026-09-12T12:00-07:00\nDestination timezone: America/Los_Angeles\nBooking reference: ABC123\nTraveler reference: TRAVELER-1\nSegment reference: COUPON-1"
+  },
+  "cancellation": {
+    "subject": "Northstar Air flight cancellation",
+    "text_body": "Your flight has been cancelled.\nEvent: CANCELLATION\nCarrier: NS\nFlight: NS123\nOrigin: ATL\nDestination: LAX\nDeparture date: 2026-09-12\nBooking reference: ABC123\nTraveler reference: TRAVELER-1\nSegment reference: COUPON-1"
+  },
+  "unrelated": {
+    "subject": "Library opening hours",
+    "text_body": "The library opens at 9 tomorrow. Please return borrowed books."
+  },
+  "incomplete": {
+    "subject": "Northstar Air booking confirmation",
+    "text_body": "Event: BOOKING\nCarrier: NS\nFlight: NS123\nOrigin: ATL\nDeparture date: 2026-09-12"
+  },
+  "conflicting": {
+    "subject": "Northstar Air booking confirmation",
+    "text_body": "Event: BOOKING\nCarrier: NS\nFlight: NS123\nFlight: NS456\nOrigin: ATL\nDestination: LAX\nDestination: PHL\nDeparture date: 2026-09-12\nDeparture date: 2026-09-13"
+  },
+  "html": {
+    "subject": "Northstar Air booking confirmation",
+    "text_body": "",
+    "html_body": "<html><style>.ticket {color: blue}</style><body><p>Thank you &amp; welcome.</p><div>Event: <b>BOOKING</b></div><div>Carrier: NS</div><div>Flight: NS123</div><div>Origin: ATL</div><div>Destination: LAX</div><div>Departure date: 2026-09-12</div><div>Departure: 2026-09-12T09:00-04:00</div><div>Origin timezone: America/New_York</div><div>Arrival: 2026-09-12T11:00-07:00</div><div>Destination timezone: America/Los_Angeles</div><div>Booking reference: ABC123</div><div>Traveler reference: TRAVELER-1</div><div>Segment reference: COUPON-1</div><script>Flight: NS999</script></body></html>"
+  }
+}

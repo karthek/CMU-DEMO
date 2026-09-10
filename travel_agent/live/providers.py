@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import Generic, Protocol, TypeVar
 from travel_agent.live.observations import Provenance, airport, number, text
 from travel_agent.live.time import utc
+from travel_agent.live.mail import MailMessage
 
 
 class ProviderErrorCode(StrEnum):
@@ -45,23 +46,6 @@ class ProviderResult(Generic[T]):
 
 
 @dataclass(frozen=True)
-class MailMessage:
-    account_id: str
-    message_id: str
-    version: str
-    sender: str
-    subject: str
-    text_body: str
-    received_at: datetime
-    html_body: str | None = None
-
-    def __post_init__(self):
-        for value in (self.account_id, self.message_id, self.version, self.sender):
-            text(value)
-        object.__setattr__(self, "received_at", utc(self.received_at))
-
-
-@dataclass(frozen=True)
 class MailSyncPage:
     messages: tuple[MailMessage, ...]
     removed_message_ids: tuple[str, ...]
@@ -74,6 +58,11 @@ class MailSyncPage:
 
 
 class MailSource(Protocol):
+    """Adapter-owned opaque cursors; pages are deltas, never complete V8 snapshots.
+
+    A completed cursor is eligible for persistence only after every page and its
+    processing results commit. Cursor expiration requires explicit resync.
+    """
     def sync(self, *, since: datetime, cursor: str | None,
              page_token: str | None = None) -> ProviderResult[MailSyncPage]: ...
 

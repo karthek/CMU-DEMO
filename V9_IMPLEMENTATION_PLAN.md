@@ -1,6 +1,6 @@
 # V9 implementation plan and continuation record
 
-## Baseline and current slice
+## Baseline and Phase 2 slice (historical)
 
 Frozen V8: `fe802c26e430e9cde97d87dba9f94b0e52d8aa3a`, annotated `v8`.
 Branch: `feature/v9-live-replanning`. Initial clean baseline verification:
@@ -259,9 +259,10 @@ overrides for scores, eligibility, replanning, current time or authorization.
 1. Write this durable plan before code. DONE.
 2. Foundation only: aware primitives/conversion, typed provider/config contracts,
    host observation validation/freshness, ReplanningPolicy/Evaluator and tests.
-   Run full suite; stop for review. CURRENT SLICE.
-3. Explicit DB migrations, observations/sync storage, origin/state persistence and
-   deterministic mail extractor with offline fixtures for Gmail/Outlook sources.
+   Run full suite; stop for review. DONE, committed as caa600c96e27f1e4dc33711ef2592cd549e3d5d3.
+3. Explicit DB migrations, observations/sync storage and deterministic mail
+   extraction/reconciliation with offline fixtures. CURRENT REVIEW SLICE.
+   Origin/lifecycle state persistence is deferred until its service contracts exist.
 4. Concrete Gmail/Graph/Google Calendar/FlightAware/Routes adapters after official
    API documentation/account capability verification; injected HTTP stubs, no live
    network in tests. Persist cursors only after committed processing.
@@ -289,7 +290,7 @@ service, hotel/rental-car/rail discovery, off-airport parking, autonomous flight
 booking/rebooking/refund, observability/LangSmith, LLM-as-judge, or V10 host
 portability evaluation. No direct security/parking/rideshare/location integrations.
 
-## Phase 2 completion / resume here
+## Phase 2 completion (historical)
 
 Completed 2026-09-10. New files:
 - travel_agent/live/time.py: explicit aware/UTC primitives, IANA local conversion,
@@ -321,3 +322,151 @@ database writes, finalize schema projections/versioning and test byte-preserved 
 history. Before HITL writes, settle authenticated human approval evidence; proposal
 IDs or host booleans alone cannot establish human intent. No commits/pushes/tags
 were made in this slice, and v8 remains frozen.
+
+## Phase 3 implementation / resume here
+
+Implemented from `caa600c96e27f1e4dc33711ef2592cd549e3d5d3` on
+`feature/v9-live-replanning`. Before implementation the complete Phase 2 baseline
+passed: 195 tests and 222 subtests. This phase is left uncommitted for review.
+
+### Persistence and migration entry point
+
+`travel_agent.live.repository.LiveRepository(path, as_of=aware_time)` explicitly
+opts into the V9 schema. The existing V8 repository, service, planner, composition
+and four MCP tools are unchanged. V8 initialization continues creating exactly
+its six-table schema; opening through LiveRepository migrates that database.
+New LiveRepository databases contain both the six legacy tables and the V9 tables.
+No real user database was migrated during development; tests use temporary files.
+
+Migration version 1 is additive and transactional (`BEGIN IMMEDIATE`). It compares
+the complete SQLite schema, including indexes and immutable-revision triggers,
+against the known V8 schema or current V9 schema. Partial, altered and unknown
+schemas are refused. The version/checksum ledger is checked on every V9 open;
+unknown versions or changed checksums are refused. Foreign keys are enabled and
+checked before commit. Repeated migration does not change the ledger timestamp.
+Pending caller transactions are rejected. Migration never updates legacy rows,
+rewrites JSON, or converts legacy timestamps. A failed DDL step rolls back all
+new tables and the ledger. Optional `backup_path` uses SQLite backup before the
+migration and refuses to overwrite an existing file. A backup is a pre-migration
+snapshot; callers must coordinate access if they need it to match concurrent writes.
+
+Actual new tables (no vendor-specific tables):
+
+| Table | Identity and contents |
+|---|---|
+| schema_migrations | Integer migration version, SHA-256 SQL checksum, aware applied_at |
+| provider_sync_state | PK provider/account; opaque cursor; last successful and attempted timestamps; SUCCESS/ERROR and typed error JSON |
+| mail_messages | PK provider/account/message/version; normalized message JSON, extraction JSON, received_at and stored_at |
+| live_observations | Immutable observation ID; discriminator; segment association; typed normalized payload JSON; source, observed_at, retrieved_at, retrieved_by |
+| retrieval_attempts | Immutable attempt ID; provider/account; type/segment/time; FK to successful observation OR typed failure JSON |
+
+Observation types are SECURITY, PARKING, RIDESHARE, LOCATION, FLIGHT and TRAFFIC.
+Provenance is retained in normalized payloads as well as queryable columns.
+Location can be unscoped. Other observations require a segment identity. The
+optional `legacy_segment_id` is an enforced FK to V8 `segments`, with an equality
+constraint to the logical segment ID; its itinerary can be obtained through V8's
+existing FK. New logical segment identities do not yet have a canonical V9 table
+and therefore are not given a fictitious foreign key. The later projection phase
+must establish that association before using evidence for reliable planning.
+Storage of a location permission reference does not grant permission: callers
+still validate observations against session authority through Phase 2 contracts.
+
+Mail, observations and retrieval attempts reject updates, deletes and SQL REPLACE
+of existing identities. Identical repository-level replays are no-ops; identity
+reuse with different evidence fails. Observation failures have separate rows and
+never replace last-known-good observations or change their freshness timestamps.
+The repository returns observation records with canonical JSON; it does not yet
+select a trusted/latest observation or resolve live-data source conflicts.
+
+### Mail model and deterministic extraction
+
+`live.mail.MailMessage` is the single normalized contract, re-exported from
+`live.providers` for Phase 2 compatibility. Existing positional arguments remain
+valid. Added fields are provider, optional thread ID, recipient tuple and typed
+provenance. Legacy default UNSPECIFIED provider/missing provenance remains usable
+for old fake contract tests but is refused for durable mail and supported extraction.
+Timestamps normalize to UTC; source metadata is preserved. The HTML body is retained
+as evidence, with a local HTMLParser producing extraction text. Text whitespace,
+line endings, entities and block boundaries normalize deterministically; script
+and style contents are excluded from extraction. No remote content is fetched.
+
+`ItineraryExtractor` selects exactly one injected rule by explicit matching.
+Each rule validates sender/template, reads fields, checks internal consistency,
+and returns BOOKING, CHANGE, CANCELLATION, UNRESOLVED or NOT_TRAVEL. Results carry
+the full source message/provenance and rule identity. Multiple matching rules are
+UNRESOLVED. Suspicious flight/booking messages without a supported rule are
+UNRESOLVED; clearly unrelated messages are NOT_TRAVEL.
+
+The sole default rule is `synthetic-northstar/v1`, for the fictional Northstar Air
+and the reserved `northstar.example.test` sender domain. It uses exact subjects
+and labeled single-segment fields. It is a framework proof, not real airline email
+support or a general prose parser. Its bounded airport registry is ATL/PHL/LAX.
+Required extraction identity: carrier, flight number, origin, destination and
+explicit departure date, plus event consistent with the subject. Optional times,
+arrival and booking/traveler/segment references are never invented. A supplied
+timestamp requires its explicit airport IANA zone and matching numeric offset;
+invalid dates, DST gaps, inconsistent date/offset/route, and conflicting duplicate
+fields across text/HTML alternatives are UNRESOLVED. Ambiguous DST folds are
+resolved only by the explicit supplied offset. Missing time remains null.
+
+Seven synthetic local fixtures cover booking, change, cancellation, unrelated,
+incomplete, conflicting and HTML-only messages. Tests derive further malformed,
+multipart, DST, replay and cross-provider variants. No LLM, SDK, live API, web
+scraping, credentials or external airline samples are used.
+
+### Reconciliation and synchronization boundary
+
+`reconcile` operates on immutable extraction evidence, including records reloaded
+from SQLite. Canonical segment-group identity is the exact tuple of validated
+carrier + booking reference + configured traveler reference + stable segment/coupon
+reference, encoded unambiguously and SHA-256 hashed. Caller-owned traveler
+configuration must match; mailbox recipient text alone never authorizes identity.
+Missing references or message/version collisions become unresolved evidence.
+Flight/date/route similarity alone never merges bookings. Distinct booking,
+traveler or segment references stay separate even when flight details are identical.
+
+Equivalent information across provider messages contributes to one group while
+retaining every source/version. Identical message replay contributes only once.
+Changes/cancellations retain stable identity and all evidence. If event types or
+segment facts differ, `needs_resolution=True`: no current revision is selected
+using receipt order, and no activatable V8 segment is written. Booking-reference
+reuse across booking lifetimes is likewise conservatively unresolved if facts
+differ. Authoritative change ordering and canonical current-state projection are
+deliberately deferred. Rule/version changes require explicit future reprocessing;
+they cannot silently overwrite stored extraction results.
+
+`MailSource` and `MailSyncPage` remain provider-neutral delta ports. Gmail history,
+Graph delta and page tokens stay opaque to extraction/reconciliation. The caller
+must assemble all pages before `complete_sync`; the repository atomically commits
+their messages/extraction results and completed cursor, checking expected prior
+cursor, provider/account scope and time order. An extraction failure or message
+collision rolls back the entire batch and cursor. Empty deltas retain old evidence.
+Failed sync preserves the cursor and last successful time while recording a safe
+typed error. CURSOR_EXPIRED is evidence for future explicit resync, not an empty
+mailbox. No pagination runner or tombstone application is implemented here;
+mail deletion must never be interpreted as flight cancellation.
+
+### Limits and exact next boundary
+
+Reconciliation is pure and reconstructible from persisted extraction evidence;
+no canonical itinerary/alias projection is persisted yet. Neither resolved nor
+unresolved mail is wired into V8 activation, snapshot application or planning.
+The schema has no origin/lifecycle, host-event or HITL/action tables. There are no
+live adapters, network calls, worker, MCP changes, calendar writes or V10 additions.
+
+Recommended next bounded phase: offline synchronization application and canonical
+booking projection. Define/test complete page and removal handling, explicit
+resync, authoritative change ordering, canonical aliases and aware current-state
+projections while retaining all V8 history and automatic attempts. Review those
+contracts before wiring a shared application service. Live adapter implementation
+remains a separate later phase requiring official API/account capability checks.
+
+Final Phase 3 verification: 236 tests and 245 subtests passed in 26.91 seconds,
+with no failures or skips. This adds 41 tests and 23 subtests to the unchanged
+195-test/222-subtest baseline. Coverage includes migration idempotency, V8 history
+and completed-attempt preservation, optional backup, DDL failure rollback, unknown
+schema/version refusal, foreign keys, cursor failure/replay, immutable evidence,
+all six observation types, extraction states, multipart conflicts, DST and
+cross-provider reconciliation. Existing tests were not changed or removed.
+The tracked diff and new source files were reviewed; no V8 source file changed.
+No commit, staging, push or later-phase implementation was performed.
