@@ -70,6 +70,15 @@ class MailSource(Protocol):
              page_token: str | None = None) -> ProviderResult[MailSyncPage]: ...
 
 
+class RetainedMailIdentityLookup(Protocol):
+    """Read-only admission membership, independent of version and travel meaning.
+
+    Inject a repository-owned callable; failures must propagate, never mean False.
+    Hidden/deleted mail remains retained if immutable evidence exists.
+    """
+    def __call__(self, *, provider: str, account_id: str, message_id: str) -> bool: ...
+
+
 @dataclass(frozen=True)
 class FlightIdentity:
     segment_id: str

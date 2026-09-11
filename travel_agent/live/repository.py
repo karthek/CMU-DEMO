@@ -59,6 +59,18 @@ class LiveRepository:
                                       (provider, account_id)).fetchone()
         return dict(row) if row else None
 
+    def has_retained_mail_identity(self, *, provider, account_id, message_id):
+        """Indexed immutable-evidence membership; no version or projection lookup.
+
+        Compose this bound callable into a source, not the repository itself.
+        Concurrent synchronization is still checked by commit_sync's expected state.
+        """
+        for value in (provider, account_id, message_id):
+            text(value)
+        return self.connection.execute(
+            "SELECT 1 FROM mail_messages WHERE provider=? AND account_id=? AND message_id=? LIMIT 1",
+            (provider, account_id, message_id)).fetchone() is not None
+
     def _store_messages(self, messages, *, as_of, extractor):
         results = []
         for message in messages:

@@ -1,6 +1,63 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint (Phase 5B)
+## Current continuation checkpoint (Phase 5C freeze)
+
+Phase 5B is frozen and committed at
+`596e76559f91460d33cf69c46783fada71fac3e1` on
+`feature/v9-live-replanning`; branch and HEAD were reverified on 2026-09-11.
+This record accompanies the authorized Phase 5C freeze commit, whose parent is
+the Phase 5B commit above. The user approved the narrow
+provider-neutral retained-identity clarification, complete review, and the smallest
+correction to the response-byte accounting defect found during that review.
+
+Approved decision: "Gmail tells us what changed. The local evidence store tells us
+what we already retained." RetainedMailIdentityLookup is a read-only callable keyed
+only by provider/account/message. LiveRepository.has_retained_mail_identity reads
+existing immutable mail_messages through its primary-key prefix; no version,
+visibility or travel meaning enters membership. GmailMailSource receives only the
+bound capability. Retained old messages remain processable in incremental sync;
+never-retained messages below the fixed discovery bound are not newly admitted.
+No migration, new table or membership cache is needed. Phase 5B remains unchanged.
+
+Post-correction conclusion: **A. PHASE 5C APPROVED FOR COMMIT**. The earlier review
+found that parsed-dict reserialization lost received-byte information: a stubbed
+attempt consumed 360 bytes under a 100-byte batch budget and emitted a cursor.
+The approved correction is implemented: one GmailByteBudget per source attempt,
+passed to the existing read client, counts and bounds actual response-body reads
+before JSON parsing. Both response and attempt-wide limits are inclusive, with a
+single counted/rejected byte to detect overflow at EOF boundaries. Profile, list,
+history, message, attachment and consumed HTTP-error-body bytes share the allowance.
+Exhaustion uses existing UNSUPPORTED_CAPABILITY and emits no cursor; independent
+attempts reset. No provider-neutral evidence/persistence contract changed. Full
+A-M findings, exact budget semantics and regression/membership-test mappings are in
+[V9_PHASE_5C_GMAIL_ADAPTER.md](V9_PHASE_5C_GMAIL_ADAPTER.md).
+
+Validation: new byte-budget regressions **22 passed in 3.00s**; all Phase 5C focused
+tests **130 passed in 3.68s** (all original 108 plus 22 new); relevant synchronization,
+repository/recovery and semantic compatibility tests **145 passed + 23 subtests
+in 9.91s**; complete suite **466 passed + 245 subtests in 34.86s**, no failures or
+skips, using the checkout .venv Python. Existing V8 source/tests are unchanged against v8; frozen
+Phase 5B document, evidence helper, synchronization, booking repository, migrations
+and dependency manifests are unchanged against the Phase 5B parent. No dependencies, credentials,
+real mailbox fixtures or runtime integration were added. Hashes also confirm that
+retained identity and MIME semantic implementation are unchanged by this correction.
+Phase 5D is ready for a separately scoped review/authorization, not begun here.
+
+The byte-budget correction touched only gmail_client.py, gmail.py, both Gmail test
+files and the two review/continuation documents. The complete Phase 5C freeze has
+nine files: V9_IMPLEMENTATION_PLAN.md, V9_PHASE_5C_GMAIL_ADAPTER.md,
+travel_agent/live/providers.py, travel_agent/live/repository.py,
+travel_agent/live/gmail.py, travel_agent/live/gmail_client.py,
+travel_agent/live/gmail_mime.py, tests/test_v9_gmail.py and tests/test_v9_gmail_client.py.
+The user authorized the local commit with message
+`V9 Phase 5C: add Gmail provider adapter and bounded synchronization`.
+Final review found no scope expansion, secrets, generated artifacts, unrelated
+changes or accidental V8 changes. Pre-commit HEAD was verified against the Phase 5B
+parent; frozen v7/v8 refs remain unchanged. No push or Phase 5D work is authorized
+by this freeze. The validated 466-test/245-subtest baseline above remains applicable;
+the freeze review only clarified documentation history, with no source/test edits.
+
+### Phase 5B historical checkpoint (superseded by the Phase 5B commit above)
 
 Phase 5A is committed as `f30f91ba7d2a374b1652af50605b72a7acedd6d2` on
 `feature/v9-live-replanning`; the tree was verified clean at Phase 5B start.
@@ -890,7 +947,7 @@ passed; migration 1 and migration 2 checksums remain unchanged. Final committed
 checkpoint: feature/v9-live-replanning / b5fcab8036c88dac56045debb984442a6673fa50,
 with a clean working tree after Phase 4. No concrete Phase 5 adapter was begun.
 
-## Phase 5B result (implemented, uncommitted; stop for review)
+## Phase 5B historical pre-commit result (superseded by the current checkpoint)
 
 Reviewed official Google documentation on 2026-09-11; exact sources and ambiguities
 are in V9_PHASE_5B_GMAIL_CONTRACT.md. Frozen decisions: immutable scoped message ID,
