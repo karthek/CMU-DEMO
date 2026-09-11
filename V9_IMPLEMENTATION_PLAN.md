@@ -1,5 +1,22 @@
 # V9 implementation plan and continuation record
 
+## Current continuation checkpoint (Phase 5A)
+
+Phase 4 is committed as `b5fcab8036c88dac56045debb984442a6673fa50` on
+`feature/v9-live-replanning`. The working tree was clean after Phase 4 and was
+verified clean at the start of Phase 5A. Latest recorded baseline: **329 tests +
+245 subtests passing**, no failures or skips. Phase 5A changes documentation only;
+that baseline has not been rerun for this slice.
+
+Phase 5A provider contract and integration boundary review is recorded in
+[V9_PHASE_5A_PROVIDER_CONTRACT_REVIEW.md](V9_PHASE_5A_PROVIDER_CONTRACT_REVIEW.md).
+Its proposed schemas are design requirements, not implemented Python contracts.
+Official provider documentation, exact API mappings and scopes remain unverified:
+Phase 5A prohibits network calls. No adapter is approved by this record.
+Before another database migration, consolidate migration runner ownership while
+preserving existing migration SQL/checksums and immutable history. Before sustained
+live mailbox ingestion, address or explicitly bound all-history reprojection.
+
 ## Baseline and Phase 2 slice (historical)
 
 Frozen V8: `fe802c26e430e9cde97d87dba9f94b0e52d8aa3a`, annotated `v8`.
@@ -264,11 +281,15 @@ overrides for scores, eligibility, replanning, current time or authorization.
    extraction/reconciliation with offline fixtures. DONE, committed as
    1f71d3b33aae6aa9bb9538f380a7e3467177eb83.
    Origin/lifecycle state persistence is deferred until its service contracts exist.
-4. Offline mail synchronization + canonical booking projection. Implemented;
-   uncommitted architectural review slice. See Phase 4 continuation below.
-5. Concrete Gmail/Graph/Google Calendar/FlightAware/Routes adapters after official
-   API documentation/account capability verification; injected HTTP stubs, no live
-   network in tests. Persist cursors only after committed processing.
+4. Offline mail synchronization + canonical booking projection. DONE, committed as
+   b5fcab8036c88dac56045debb984442a6673fa50, including all three corrections below.
+5. Gmail Mail, Microsoft Graph Mail, Google Calendar reads, Microsoft Graph Calendar
+   reads, FlightAware AeroAPI v4 and Google Routes adapters, after official API
+   documentation/account capability verification. Inject HTTP stubs; no live network
+   in tests. Persist cursors only after committed processing. Phase 5A is the
+   documentation/contract review; later bounded slices implement each provider.
+   A separate later Phase 5 real-mail-template slice must define and test deterministic
+   extraction and document authority before claiming real airline support.
 6. Aware V9 planning/transport/feasibility migration and reliable-data gating;
    conflict conservatism; compare active-plan snapshots; retain V7 compatibility.
 7. Shared live monitoring service, events/host-input protocol, MCP schema review,
@@ -477,13 +498,14 @@ The original implementation stopped before staging/commit/push; Phase 3 was
 subsequently committed at the hash above. The limits in this section describe
 Phase 3; the following section records the additive Phase 4 implementation.
 
-## Phase 4 implementation / resume here
+## Phase 4 implementation (completed and committed)
 
-Offline Mail Synchronization + Canonical Booking Projection is implemented for
-architectural review. Starting branch: `feature/v9-live-replanning`; starting HEAD:
-`1f71d3b33aae6aa9bb9538f380a7e3467177eb83`. The starting tree was clean and the
-236-test/245-subtest baseline was freshly verified. Phase 4 is UNCOMMITTED.
-Do not commit, push, or begin Phase 5 before the user's architectural review.
+Offline Mail Synchronization + Canonical Booking Projection was committed as
+`b5fcab8036c88dac56045debb984442a6673fa50` on `feature/v9-live-replanning`.
+Phase 4 started from the committed Phase 3 checkpoint with a clean tree and a
+freshly verified 236-test/245-subtest baseline. The historical implementation and
+correction results below culminate in 329 tests/245 subtests and a clean committed
+tree. Phase 5A is separately authorized for documentation/contract design only.
 
 ### Architecture and entry points
 
@@ -495,9 +517,9 @@ New source files:
   history queries, canonical projection and atomic synchronization checkpoint.
 - `travel_agent/live/mail_sync.py`: bounded run-once synchronization application.
 
-New tests: `tests/test_v9_mail_sync.py` and
-`tests/test_v9_projection_migration.py`. Existing source and test files are
-unchanged. Only this plan is modified among previously tracked files.
+Initial new tests: `tests/test_v9_mail_sync.py` and
+`tests/test_v9_projection_migration.py`; correction tests are listed below.
+Phase 2/3 and V8 source and tests were unchanged by Phase 4.
 
 Use `BookingRepository(path, as_of=aware_time)` and
 `MailSynchronization(repository, authorized_travelers=frozenset(...))`.
@@ -667,10 +689,9 @@ Original Phase 4 verification on 2026-09-10: 45 new tests passed in 2.60 seconds
 Complete suite: **281 tests and 245 subtests passed in 35.05 seconds**, no failures
 or skips. Existing 236 tests and 245 subtests were not edited or removed.
 `git diff --check` and a whitespace scan including all untracked additions passed.
-The tracked source/test diff against HEAD is empty; migration 1 and all V8/V9
-Phase 2/3 source remain unchanged. No live network calls or secrets were introduced.
-Final status: one modified plan and six untracked additions listed above, nothing
-staged; branch/HEAD remain the starting values. No commit or push was performed.
+Migration 1 and all V8/V9 Phase 2/3 source remained unchanged. No live network
+calls or secrets were introduced. This initial checkpoint preceded the three
+corrections and the final Phase 4 commit recorded above.
 
 Phase 4 tests cover all 20 requested scenarios, plus sequence collisions/lifetime
 reuse, cancellation-first delivery, deterministic permutations, malformed authority,
@@ -688,8 +709,9 @@ reprojection suitable for bounded offline proof. There is no operational flight
 authority, general airline parser, manual conflict repair, distributed execution,
 worker, host event delivery, new MCP tool, live authentication or calendar action.
 
-Next phase is Phase 5: concrete Gmail/Graph, Google Calendar, FlightAware and Google
-Routes adapters, following separate authorization and official API/account/scopes
+Next phase is Phase 5: Gmail Mail, Microsoft Graph Mail, Google Calendar reads,
+Microsoft Graph Calendar reads, FlightAware AeroAPI v4 and Google Routes adapters,
+following separate authorization and official API/account/scopes
 verification. Adapt vendor payloads to the tested normalized contracts, use injected
 HTTP stubs, and keep tests offline. Do not treat the synthetic airline sequence as
 available in real mail without a reviewed template authority contract. Phase 6 then
@@ -699,8 +721,8 @@ owns aware planning/transport migration; Phase 7 monitoring/MCP/worker; Phase 8 
 
 Only post-cancellation reactivation authority is corrected in this slice. The
 booking-lifetime identity issue and inherited sync_failed/resync issue remained
-open at this correction's completion. Migration ownership, schema/checksums, reprojection scope and Phase 5 are
-unchanged. Do not commit or push; architectural review is still pending.
+open at this correction's completion. Migration ownership, schema/checksums,
+reprojection scope and Phase 5 were unchanged at this historical checkpoint.
 
 `BookingEvent.reinstatement` is an optional typed `Reinstatement` assertion naming
 the cancelled `EventAuthority(lifetime, sequence)` and segment reference. The
@@ -740,8 +762,7 @@ complete suite **296 tests and 245 subtests passed in 56.14 seconds**, no failur
 or skips. Diff/whitespace checks passed, including untracked correction files.
 Migration 2 checksum remains
 `a1bb2682a023928b442526639a50729833a5f4ff36bace5d4511192f0fe0e999`.
-Branch/HEAD remain unchanged. The working tree contains the modified plan and
-seven untracked Phase 4 files; nothing staged, committed or pushed.
+This historical verification preceded corrections 2 and 3 and the Phase 4 commit.
 
 ### Pre-commit correction 2: booking-level lifetime compatibility
 
@@ -788,16 +809,14 @@ Files changed for correction 2: booking.py, booking_repository.py and this plan.
 Added tests/test_v9_booking_lifetimes.py with 15 focused tests for A-J, independent
 PNRs, unattributed evidence, history preservation and pre-correction read safety.
 The inherited sync_failed()/resync issue remained OPEN at correction 2 completion.
-It is addressed by the separately authorized correction 3 below. Do not commit,
-push or begin Phase 5 without the user's next instruction.
+It was addressed by the separately authorized correction 3 below.
 
 Correction 2 verification (2026-09-11): 15 focused lifetime tests passed in 1.48
 seconds; all 75 Phase 4-focused tests passed in 7.19 seconds. Complete suite:
 **311 tests and 245 subtests passed in 46.45 seconds**, no failures or skips.
 Diff/whitespace checks passed, including untracked correction files. Migration 2
-checksum is unchanged. Branch remains feature/v9-live-replanning and HEAD remains
-1f71d3b33aae6aa9bb9538f380a7e3467177eb83. Status: modified plan plus eight untracked
-Phase 4 files; nothing staged, committed or pushed.
+checksum was unchanged. This historical verification preceded correction 3 and
+the Phase 4 commit.
 
 ### Pre-commit correction 3: persistent full-resync requirement
 
@@ -839,12 +858,11 @@ Changed for correction 3: travel_agent/live/booking_repository.py and this plan.
 Added tests/test_v9_resync_requirement.py with 18 focused tests covering A-K,
 upgrade fallback, stale conditional failure, out-of-order rejection, account
 isolation and transactional recovery rollback. All three requested pre-commit
-corrections are implemented; architectural review is still required before commit.
+corrections were implemented and subsequently included in the Phase 4 commit.
 
 Correction 3 verification: 18 focused resync tests passed in 2.06 seconds; all 93
 Phase 4-focused tests passed in 6.34 seconds. Complete suite: **329 tests and 245
 subtests passed in 49.33 seconds**, no failures or skips. Diff/whitespace checks
-passed; migration 1 and migration 2 checksums remain unchanged. Branch/HEAD remain
-feature/v9-live-replanning / 1f71d3b33aae6aa9bb9538f380a7e3467177eb83.
-Status: modified plan plus nine untracked Phase 4 files; nothing staged, committed
-or pushed. No Phase 5 implementation was begun.
+passed; migration 1 and migration 2 checksums remain unchanged. Final committed
+checkpoint: feature/v9-live-replanning / b5fcab8036c88dac56045debb984442a6673fa50,
+with a clean working tree after Phase 4. No concrete Phase 5 adapter was begun.
