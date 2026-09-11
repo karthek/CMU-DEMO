@@ -1,6 +1,28 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint (Phase 5A)
+## Current continuation checkpoint (Phase 5B)
+
+Phase 5A is committed as `f30f91ba7d2a374b1652af50605b72a7acedd6d2` on
+`feature/v9-live-replanning`; the tree was verified clean at Phase 5B start.
+Phase 5B researches official public Gmail documentation (reviewed 2026-09-11) and
+freezes the bounded mail contract in
+[V9_PHASE_5B_GMAIL_CONTRACT.md](V9_PHASE_5B_GMAIL_CONTRACT.md).
+It adds only an opt-in provider-neutral immutable-evidence fingerprint helper,
+TIMEOUT/NOT_FOUND/UNSUPPORTED_CAPABILITY errors and focused offline contract tests.
+MailMessage fields/serialization, historical versions, migrations, canonical/event
+IDs, extraction, synchronization and V8 behavior remain unchanged.
+
+Phase 5C gate: separately approve the frozen identity/fingerprint, full and delta
+checkpoint rules, expiration recovery, bounded MIME profile, inclusive mailbox
+visibility, gmail.readonly scope and error translation. The future adapter must
+prove the listed offline race/replay/pagination/recovery cases. Quiet-window full
+sync and fail-closed unsupported MIME are deliberate availability limits; official
+snapshot guarantees and some empty-mailbox/MIME cases remain explicitly uncertain.
+No Gmail API calls, OAuth, Graph, real templates, credentials or Phase 5C are
+implemented or authorized by Phase 5B. Phase 5B is uncommitted; do not commit/push
+without the user's instruction. Full test results appear in the Phase 5B record below.
+
+### Phase 5A historical checkpoint
 
 Phase 4 is committed as `b5fcab8036c88dac56045debb984442a6673fa50` on
 `feature/v9-live-replanning`. The working tree was clean after Phase 4 and was
@@ -11,8 +33,9 @@ that baseline has not been rerun for this slice.
 Phase 5A provider contract and integration boundary review is recorded in
 [V9_PHASE_5A_PROVIDER_CONTRACT_REVIEW.md](V9_PHASE_5A_PROVIDER_CONTRACT_REVIEW.md).
 Its proposed schemas are design requirements, not implemented Python contracts.
-Official provider documentation, exact API mappings and scopes remain unverified:
-Phase 5A prohibits network calls. No adapter is approved by this record.
+Official provider documentation, exact API mappings and scopes were unverified in
+Phase 5A, which prohibited network calls. Phase 5B now records the bounded Gmail
+review; other providers remain unverified. No adapter is approved by this record.
 Before another database migration, consolidate migration runner ownership while
 preserving existing migration SQL/checksums and immutable history. Before sustained
 live mailbox ingestion, address or explicitly bound all-history reprojection.
@@ -866,3 +889,32 @@ subtests passed in 49.33 seconds**, no failures or skips. Diff/whitespace checks
 passed; migration 1 and migration 2 checksums remain unchanged. Final committed
 checkpoint: feature/v9-live-replanning / b5fcab8036c88dac56045debb984442a6673fa50,
 with a clean working tree after Phase 4. No concrete Phase 5 adapter was begun.
+
+## Phase 5B result (implemented, uncommitted; stop for review)
+
+Reviewed official Google documentation on 2026-09-11; exact sources and ambiguities
+are in V9_PHASE_5B_GMAIL_CONTRACT.md. Frozen decisions: immutable scoped message ID,
+opt-in normalized-evidence SHA-256 version (not history/receipt/fetch/cursor), scoped
+opaque terminal history checkpoint, conservative quiet-window full bootstrap,
+coalesced delta visibility, persistent cursor-expiration recovery, bounded strict
+MIME/body normalization, inclusive spam/trash visibility and gmail.readonly scope.
+Mail remains evidence, never operational flight authority or automatic cancellation.
+Unsupported MIME and busy/inconsistent mailbox scans fail closed; no claimed API
+snapshot guarantee or fabricated empty-mailbox cursor. These availability limits
+must remain explicit in Phase 5C review.
+
+Source changes are only mail_evidence_version() in live/mail.py and three neutral
+ProviderErrorCode additions in live/providers.py. MailMessage fields, stored JSON,
+canonical/event IDs, migrations, repositories, synchronization and extraction remain
+unchanged. Existing V8 source and tests remain byte-unchanged against v8.
+
+New tests/test_v9_mail_contract.py: 7 focused tests passed in 0.43 seconds.
+Complete suite: **336 tests + 245 subtests passed in 88.46 seconds**, no failures
+or skips. Diff/whitespace checks passed, including new files. No HTTP fakes, API
+clients, credentials, secrets or real mailbox data were introduced.
+
+Branch/HEAD remain feature/v9-live-replanning /
+f30f91ba7d2a374b1652af50605b72a7acedd6d2. Phase 5B work is unstaged/uncommitted:
+modified plan, live/mail.py and live/providers.py; new Phase 5B design and contract
+test files. No push, OAuth, Graph, real templates or Phase 5C implementation.
+The Phase 5C contract is bounded and ready for review, not authorization to proceed.

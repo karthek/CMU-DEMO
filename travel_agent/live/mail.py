@@ -2,7 +2,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import getaddresses
+from hashlib import sha256
 from html.parser import HTMLParser
+import json
 import re
 
 from travel_agent.live.observations import Provenance, text
@@ -100,3 +102,35 @@ class MailMessage:
     @property
     def bodies(self) -> tuple[str, ...]:
         return tuple(body for body in (self.text_body, html_text(self.html_body) if self.html_body else "") if body)
+
+
+def mail_evidence_version(message: MailMessage) -> str:
+    """Fingerprint normalized immutable evidence, not retrieval or sync state.
+
+    Opt-in for new sources; never rekeys historical message versions. Call after
+    normalization, then replace the provisional version with this return value.
+    Provenance must describe stable message evidence, not the latest fetch time.
+    This explicit v1 field set must not change without a new contract version.
+    """
+    if not isinstance(message, MailMessage) or message.provider == "UNSPECIFIED" or message.provenance is None:
+        raise ValueError("Scoped mail evidence and provenance required")
+    evidence = {
+        "provider": message.provider,
+        "account_id": message.account_id,
+        "message_id": message.message_id,
+        "sender": message.sender,
+        "subject": message.subject,
+        "text_body": message.text_body,
+        "html_body": message.html_body,
+        "received_at": message.received_at.isoformat(),
+        "thread_id": message.thread_id,
+        "recipients": message.recipients,
+        "provenance": {
+            "source": message.provenance.source,
+            "observed_at": message.provenance.observed_at.isoformat(),
+            "retrieved_by": message.provenance.retrieved_by.value,
+        },
+    }
+    payload = json.dumps(evidence, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=True, allow_nan=False).encode("utf-8")
+    return "mail-evidence/v1:sha256:" + sha256(payload).hexdigest()
