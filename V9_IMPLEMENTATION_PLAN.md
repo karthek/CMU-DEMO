@@ -261,16 +261,19 @@ overrides for scores, eligibility, replanning, current time or authorization.
    host observation validation/freshness, ReplanningPolicy/Evaluator and tests.
    Run full suite; stop for review. DONE, committed as caa600c96e27f1e4dc33711ef2592cd549e3d5d3.
 3. Explicit DB migrations, observations/sync storage and deterministic mail
-   extraction/reconciliation with offline fixtures. CURRENT REVIEW SLICE.
+   extraction/reconciliation with offline fixtures. DONE, committed as
+   1f71d3b33aae6aa9bb9538f380a7e3467177eb83.
    Origin/lifecycle state persistence is deferred until its service contracts exist.
-4. Concrete Gmail/Graph/Google Calendar/FlightAware/Routes adapters after official
+4. Offline mail synchronization + canonical booking projection. Implemented;
+   uncommitted architectural review slice. See Phase 4 continuation below.
+5. Concrete Gmail/Graph/Google Calendar/FlightAware/Routes adapters after official
    API documentation/account capability verification; injected HTTP stubs, no live
    network in tests. Persist cursors only after committed processing.
-5. Aware V9 planning/transport/feasibility migration and reliable-data gating;
+6. Aware V9 planning/transport/feasibility migration and reliable-data gating;
    conflict conservatism; compare active-plan snapshots; retain V7 compatibility.
-6. Shared live monitoring service, events/host-input protocol, MCP schema review,
+7. Shared live monitoring service, events/host-input protocol, MCP schema review,
    replaceable worker, local claim/recovery integration and real stdio tests.
-7. HITL authentication design review, proposal storage, conditional execution,
+8. HITL authentication design review, proposal storage, conditional execution,
    verification/reconciliation and failure/duplicate-execution tests.
 
 Tests: naive rejection, DST folds/gaps, UTC-equivalent instants, explicit legacy
@@ -315,19 +318,20 @@ live provider adapter, worker, calendar write port, conflict resolver, host-even
 store or service integration is implemented yet. same_terminal_gate_buffer_minutes
 is configuration only until the explicit V9 feasibility migration.
 
-Next instruction should review this slice, then authorize the next bounded phase.
+Historical review boundary for the Phase 2 slice:
 Before implementing adapters, verify official provider documentation and required
 account/scopes; this foundation intentionally assumes no endpoint details. Before
 database writes, finalize schema projections/versioning and test byte-preserved V8
 history. Before HITL writes, settle authenticated human approval evidence; proposal
-IDs or host booleans alone cannot establish human intent. No commits/pushes/tags
-were made in this slice, and v8 remains frozen.
+IDs or host booleans alone cannot establish human intent. Phase 2 was subsequently
+committed as `caa600c96e27f1e4dc33711ef2592cd549e3d5d3`; v8 remains frozen.
 
-## Phase 3 implementation / resume here
+## Phase 3 implementation (completed and committed)
 
 Implemented from `caa600c96e27f1e4dc33711ef2592cd549e3d5d3` on
 `feature/v9-live-replanning`. Before implementation the complete Phase 2 baseline
-passed: 195 tests and 222 subtests. This phase is left uncommitted for review.
+passed: 195 tests and 222 subtests. Phase 3 was committed as
+`1f71d3b33aae6aa9bb9538f380a7e3467177eb83` after review.
 
 ### Persistence and migration entry point
 
@@ -446,7 +450,7 @@ typed error. CURSOR_EXPIRED is evidence for future explicit resync, not an empty
 mailbox. No pagination runner or tombstone application is implemented here;
 mail deletion must never be interpreted as flight cancellation.
 
-### Limits and exact next boundary
+### Historical Phase 3 limits and next boundary
 
 Reconciliation is pure and reconstructible from persisted extraction evidence;
 no canonical itinerary/alias projection is persisted yet. Neither resolved nor
@@ -469,4 +473,378 @@ schema/version refusal, foreign keys, cursor failure/replay, immutable evidence,
 all six observation types, extraction states, multipart conflicts, DST and
 cross-provider reconciliation. Existing tests were not changed or removed.
 The tracked diff and new source files were reviewed; no V8 source file changed.
-No commit, staging, push or later-phase implementation was performed.
+The original implementation stopped before staging/commit/push; Phase 3 was
+subsequently committed at the hash above. The limits in this section describe
+Phase 3; the following section records the additive Phase 4 implementation.
+
+## Phase 4 implementation / resume here
+
+Offline Mail Synchronization + Canonical Booking Projection is implemented for
+architectural review. Starting branch: `feature/v9-live-replanning`; starting HEAD:
+`1f71d3b33aae6aa9bb9538f380a7e3467177eb83`. The starting tree was clean and the
+236-test/245-subtest baseline was freshly verified. Phase 4 is UNCOMMITTED.
+Do not commit, push, or begin Phase 5 before the user's architectural review.
+
+### Architecture and entry points
+
+New source files:
+- `travel_agent/live/booking.py`: pure typed events, authority comparison, exact
+  identity hashing, canonical models, all-history projection and readiness.
+- `travel_agent/live/projection_migrations.py`: opt-in additive migration 2.
+- `travel_agent/live/booking_repository.py`: migration-2 repository, evidence and
+  history queries, canonical projection and atomic synchronization checkpoint.
+- `travel_agent/live/mail_sync.py`: bounded run-once synchronization application.
+
+New tests: `tests/test_v9_mail_sync.py` and
+`tests/test_v9_projection_migration.py`. Existing source and test files are
+unchanged. Only this plan is modified among previously tracked files.
+
+Use `BookingRepository(path, as_of=aware_time)` and
+`MailSynchronization(repository, authorized_travelers=frozenset(...))`.
+Call `run(source, provider, account_id, as_of=aware_time, full=False)` with an
+injected normalized MailSource. A missing cursor starts a full sync; `full=True`
+explicitly requests full resync. The injected SynchronizationPolicy supplies the
+365-day default lookback. The same since/cursor scope is used for every page.
+Default bounds are 100 pages and 10,000 combined messages/removal identities.
+Sources, extraction and projection are injected; no credentials are loaded.
+
+`BookingRepository` reuses Phase 3 evidence serialization, extraction, queries
+and reconciliation. Its inherited cursor-only `complete_sync` and evidence-only
+`store_messages` entry points are explicitly refused to prevent bypassing the
+Phase 4 transaction. `LiveRepository` remains the historical migration-1 evidence
+entry point and intentionally refuses a migration-2 schema. Use BookingRepository
+after upgrading. V8's repository remains unchanged and can retain its own behavior
+on the additive schema. No V8 service, composition, activation or MCP path is wired
+to the new application.
+
+### Three separate identities and the bounded authority contract
+
+Message identity remains `(provider, account_id, message_id, version)`. Exact
+replay does not duplicate stored messages, events or revisions. Changed evidence
+under the same identity fails the transaction. Opaque versions are not ordered.
+
+Canonical booking ID is SHA-256 over the unambiguous JSON tuple of exact validated
+carrier + booking reference + configured traveler reference. Canonical segment ID
+adds the stable segment/coupon reference, retaining Phase 3 reconciliation IDs.
+Departure times, route, flight number and mailbox identity are not canonical keys.
+Different coupons under a PNR remain distinct. No fallback/fuzzy identity exists.
+Missing references or unconfigured travelers remain queryable unresolved extraction
+evidence without inventing a canonical association. Recipient text grants nothing.
+
+`BookingEvent` is BOOKING, CHANGE or CANCELLATION and retains extracted segment
+facts, typed EventAuthority, issues and `booking-events/v1` parser identity.
+The separately versioned event parser recognizes optional `Booking lifetime:` and
+`Airline sequence:` lines in the existing fictional Northstar template. Phase 3
+extraction JSON and its rule are unchanged. Both authority fields must occur with
+one consistent value across text/HTML alternatives. Lifetime is an explicit bounded
+uppercase reference; sequence is an integer from 0 through 2147483647. Malformed,
+partial or contradictory authority becomes an issue and blocks the projection.
+
+Within one canonical segment and one explicit lifetime, a higher airline sequence
+orders evidence. Cancellation additionally requires explicit reinstatement proof
+before a BOOKING or CHANGE can become active again (see correction below). This is a
+synthetic document contract, not a Gmail/Graph guarantee or a generic airline rule.
+The typed comparator returns OLDER/NEWER/EQUAL/UNKNOWN. Equal order is equivalent
+only when event type and segment facts also agree. Different lifetimes under a
+reused identity remain unresolved; the implementation does not guess a new lifetime
+association or merge its facts. Mail receipt time and opaque version never grant
+travel-event authority. Source sender matching is not email authentication.
+
+### Projection, history and readiness
+
+Projection examines all persisted events, independently of processing order.
+Identical event facts/authority converge to one event with separate source links.
+The greatest comparable sequence selects current booking evidence. Older arrivals
+remain auditable without replacing a newer schedule or resurrecting cancellation.
+A higher CHANGE alone cannot supersede a CANCELLATION. A valid explicit reinstatement
+must reference the currently effective cancellation. CHANGE is a complete bounded
+segment fact set, not a field patch.
+Missing optional values are not filled from an older message.
+
+Different facts with missing order, different lifetimes, invalid authority, or
+contradictory facts at any identical sequence produce `UNRESOLVED`, null current
+schedule and `CONFLICTING_EVENT_HISTORY`. Even a later sequence does not silently
+repair a contradictory same-sequence history. No manual resolution workflow is
+implemented. Equivalent unsequenced facts can form a booking; differing later
+facts without comparable authority remain unresolved.
+
+Explicit CANCELLATION produces `CANCELLED`, never deletion. Its own schedule can
+be incomplete; earlier schedules remain in immutable events and any previously
+published revisions. Evidence arriving late need not become a historical *current*
+revision if it was never current. `current_authority` is exposed separately from
+mail metadata. Content-addressed revisions include canonical state and authority;
+equivalent copies add provenance without another revision. Successful sync records
+retain the current revision association, including repeated values/checkpoints.
+
+`planning_readiness(segment, authorized_travelers=...)` returns PlanningReadiness:
+either typed PlanningReadySegment or structured rejection reasons, with
+`planning_allowed`. BOOKED alone is insufficient. Readiness rejects cancelled or
+unresolved state, absent current schedule, unauthorized traveler, missing departure
+or origin zone, naive/invalid time, local departure-date mismatch, invalid route,
+missing flight number, and invalid supplied arrival/arrival zone. New scheduled
+instants remain aware UTC and source IANA zones remain attached.
+
+Future activation consumes stable booking/segment IDs, carrier/flight/route,
+traveler and booking references, and aware departure (plus optional arrival and
+source zones) from PlanningReadySegment. It must recheck the stored current
+revision/readiness before acting. This is booking-data eligibility only: it is not
+operational flight authority, freshness approval or permission to activate V8.
+Simulated provenance remains simulated. Reliable live planning still needs later
+validated operational observations. Cancelled/unresolved segments yield no handoff.
+Do not strip timezone information or manufacture V8 gate/time fields. A future
+aware planning/activation integration must define that boundary explicitly and
+preserve all V8 automatic attempts. No activation adapter was necessary here.
+
+### Synchronization and mailbox visibility
+
+The application retrieves all pages before database mutation. Empty intermediate
+pages and completed empty deltas are valid. Missing/ambiguous completion tokens,
+pagination cycles, limits, scope violations and contradictory present/removed
+signals for the same message in one batch fail conservatively. There is no
+provider-specific interpretation of page tokens or deletion ordering.
+
+One `BEGIN IMMEDIATE` transaction checks the expected full sync-state checkpoint
+and time ordering, persists normalized messages/extraction, reconciles identities,
+stores events/provenance, projects all canonical segments, writes immutable
+revisions/checkpoint associations and mailbox visibility, then advances the cursor.
+Any extraction/reconciliation/projection/SQL failure rolls this entire transaction
+back. No provider I/O occurs under the database transaction. Concurrent checkpoint
+changes are rejected. A safe typed failure code is recorded separately using a
+compare-and-record transaction when possible; exception text is not persisted.
+Failed-attempt status retains the prior cursor and last successful time. Audit is
+best effort when the database itself cannot be written; historical failures are
+not an append-only attempt log in this bounded phase.
+
+Explicit cursor expiration sets a persistent full-resync requirement. A failed
+full resync cannot clear that requirement; only a successful full checkpoint can.
+There is no automatic silent fallback from an expired cursor to an empty mailbox.
+Provider-specific invalid cursor responses must later map to CURSOR_EXPIRED when
+they require resync, rather than a generic INVALID_RESPONSE.
+
+Provider tombstones record only source visibility. Full-sync absence records only
+visibility within the requested lookback, retaining older out-of-window evidence.
+Neither removals nor absence feed the travel projector, remove historical evidence,
+or cancel flights. Reappearance can restore mailbox visibility without changing
+travel truth. Unknown message tombstones are valid source evidence.
+
+### Migration 2 schema
+
+Migration 1 SQL and checksum are byte-for-byte untouched. Migration 2 has its own
+SHA-256 SQL checksum; every open verifies exact schema and both ledger entries.
+Empty, exact V8, exact migration-1, and exact migration-2 databases are recognized.
+Fresh creation and upgrades are transactional, additive and idempotent, with
+foreign keys enabled/checked, optional exclusive pre-migration backup and rollback
+on DDL failure. No existing rows, V8 JSON, timestamps or attempts are rewritten.
+Migration itself does not synthesize canonical state; the next successful offline
+sync reconciles retained Phase 3 evidence together with incoming evidence.
+
+| New table | Purpose |
+|---|---|
+| canonical_bookings | Unique carrier/reference/traveler identity |
+| canonical_segments | Stable coupon identity under canonical booking |
+| booking_events | Immutable distinct typed event facts and authority |
+| booking_event_evidence | Immutable message-version to event links; canonical aliases and provenance |
+| canonical_segment_revisions | Immutable content-addressed canonical projections |
+| revision_events | Evidence events considered when a revision was first created |
+| canonical_current | Current revision pointer with same-segment composite FK |
+| mail_sync_runs | Immutable successful sync scope, time and cursor checkpoint |
+| mailbox_visibility | Current provider/account/message visibility |
+| mail_removals | Immutable explicit removal or full-sync absence evidence |
+| sync_projections | Immutable current revision associations for each successful sync |
+| provider_resync_requirements | Persistent full-resync requirement per source/account |
+
+Three explicit indexes: `event_evidence_by_event`, `revisions_by_segment`, and
+`sync_runs_by_account`, plus primary-key/unique indexes. Nine identity/history/link
+tables have three triggers each (no UPDATE, DELETE or identity-reusing REPLACE):
+canonical_bookings, canonical_segments, booking_events, booking_event_evidence,
+canonical_segment_revisions, revision_events, mail_sync_runs, mail_removals and
+sync_projections. Natural-key REPLACE collisions are also guarded. Current pointers,
+visibility and resync flags are mutable projections, not immutable evidence.
+
+### Verification and concrete next boundary
+
+Original Phase 4 verification on 2026-09-10: 45 new tests passed in 2.60 seconds.
+Complete suite: **281 tests and 245 subtests passed in 35.05 seconds**, no failures
+or skips. Existing 236 tests and 245 subtests were not edited or removed.
+`git diff --check` and a whitespace scan including all untracked additions passed.
+The tracked source/test diff against HEAD is empty; migration 1 and all V8/V9
+Phase 2/3 source remain unchanged. No live network calls or secrets were introduced.
+Final status: one modified plan and six untracked additions listed above, nothing
+staged; branch/HEAD remain the starting values. No commit or push was performed.
+
+Phase 4 tests cover all 20 requested scenarios, plus sequence collisions/lifetime
+reuse, cancellation-first delivery, deterministic permutations, malformed authority,
+scope/future/time/limit failures, failed resync requirement retention, reconciliation
+failure, post-projection SQL failure, concurrent checkpoints, immutable natural-key
+REPLACE guards, fresh/Phase 3 migration rollback, backup, ledger validation, and V8
+completed-attempt preservation. Synthetic GmailStyleSource/OutlookStyleSource use
+the same normalized fake port. Network connection guards are active in sync tests.
+All message bodies derive from reserved-domain fictional Northstar fixtures; no
+real mail, booking data, credentials, tokens, API keys or provider clients were added.
+
+Limitations: one synthetic single-segment template, strict stable references,
+sequence/lifetime authority only, conservative unresolved histories, and all-history
+reprojection suitable for bounded offline proof. There is no operational flight
+authority, general airline parser, manual conflict repair, distributed execution,
+worker, host event delivery, new MCP tool, live authentication or calendar action.
+
+Next phase is Phase 5: concrete Gmail/Graph, Google Calendar, FlightAware and Google
+Routes adapters, following separate authorization and official API/account/scopes
+verification. Adapt vendor payloads to the tested normalized contracts, use injected
+HTTP stubs, and keep tests offline. Do not treat the synthetic airline sequence as
+available in real mail without a reviewed template authority contract. Phase 6 then
+owns aware planning/transport migration; Phase 7 monitoring/MCP/worker; Phase 8 HITL.
+
+### Pre-commit correction 1: explicit post-cancellation reinstatement
+
+Only post-cancellation reactivation authority is corrected in this slice. The
+booking-lifetime identity issue and inherited sync_failed/resync issue remained
+open at this correction's completion. Migration ownership, schema/checksums, reprojection scope and Phase 5 are
+unchanged. Do not commit or push; architectural review is still pending.
+
+`BookingEvent.reinstatement` is an optional typed `Reinstatement` assertion naming
+the cancelled `EventAuthority(lifetime, sequence)` and segment reference. The
+synthetic Northstar event extension recognizes all four explicit fields together:
+`Travel state: REINSTATED`, `Reinstates lifetime: ...`,
+`Reinstates cancellation sequence: ...`, and `Reinstates segment reference: ...`.
+These are travel-document assertions, not mailbox metadata or inferred event-kind
+semantics. The containing BOOKING/CHANGE still supplies the complete schedule and
+exact carrier/booking/traveler/coupon identity used by reconciliation.
+
+The assertion must name cancellation evidence present in that canonical segment,
+match its lifetime and coupon, and have strictly newer comparable authority. The
+ordered projector maintains a cancellation barrier: normal BOOKING/CHANGE events
+cannot cross it. Only an assertion targeting the currently effective cancellation
+can restore BOOKED. A second cancellation needs a new exact reinstatement link.
+Missing targets, stale links, wrong segments/lifetimes, malformed or ambiguous
+assertions, and equal-sequence contradictions remain UNRESOLVED. Older valid
+reinstatement before a later cancellation leaves the segment CANCELLED. Processing
+order never supplies authority; late-arriving target evidence may resolve a
+previously incomplete history when the full deterministic proof becomes available.
+
+Ordinary v1 event JSON/IDs remain unchanged. Explicit transition-extension events
+use `booking-events/v2` and serialize the typed assertion; the reader accepts both
+shapes. No immutable event is updated, deleted or silently reprocessed. Existing
+projection revisions remain historical; new current projections follow the fixed
+rule. Cross-provider equivalent assertions share one event and canonical revision
+while retaining every message-version provenance link.
+
+Changed for this correction: booking.py, booking_repository.py, the two obsolete
+reactivation expectations in test_v9_mail_sync.py, and this continuation record.
+Added test_v9_reinstatement.py with 15 focused tests covering the requested A-I
+cases, exact cancellation linkage, recancellation, arrival permutations, restart,
+serialization compatibility and provenance. No Phase 2/3 or V8 tests were changed.
+
+Correction verification: all 60 Phase 4-focused tests passed in 4.90 seconds;
+complete suite **296 tests and 245 subtests passed in 56.14 seconds**, no failures
+or skips. Diff/whitespace checks passed, including untracked correction files.
+Migration 2 checksum remains
+`a1bb2682a023928b442526639a50729833a5f4ff36bace5d4511192f0fe0e999`.
+Branch/HEAD remain unchanged. The working tree contains the modified plan and
+seven untracked Phase 4 files; nothing staged, committed or pushed.
+
+### Pre-commit correction 2: booking-level lifetime compatibility
+
+The bounded correction retains existing carrier/PNR/traveler booking IDs and
+coupon-based segment IDs. It adds a typed `BookingLifetimeCompatibility` with
+`LifetimeStatus` COMPATIBLE, UNKNOWN or UNRESOLVED, the sorted explicit lifetime
+values, and a flag for evidence without attributed authority. Compatibility is
+evaluated across persisted events for ALL coupons under the exact booking key.
+Two different explicit lifetimes always make that booking relationship UNRESOLVED.
+Sharing a PNR, receipt order or provider identity never proves a lifecycle link.
+
+Same lifetime/same coupon retains one segment; same lifetime/different coupons
+retains distinct segments under one compatible booking. Different lifetimes with
+either same or different coupons do not expose an active proven lifecycle. The
+shared booking ID becomes an unresolved relationship container, not a claim that
+the separate lifetimes are one valid lifecycle. No lifetime is guessed for evidence
+created before authority was known. Such evidence remains UNKNOWN/unattributed;
+existing segment-level uncertainty rules still apply, with no identity rekeying.
+
+`bookings()` exposes the typed compatibility result, reconstructed deterministically
+from immutable event evidence. During the existing sync transaction every affected
+booking's non-cancelled segment projection is constrained to UNRESOLVED with null
+schedule and BOOKING_LIFETIME_COLLISION. The constraint also applies on
+`current_segments()` reads, blocking pre-correction stored active collisions before
+another sync. Cancelled segment projections remain exactly cancelled; no schedule
+or authority is replaced merely because another coupon has a different lifetime.
+If lifetimes collide on the same coupon, the existing segment projector returns
+UNRESOLVED and the old cancelled revision remains immutable history. No new-lifetime
+state is selected or used to reinstate old travel.
+
+Future activation must consume constrained current_segments() plus the existing
+planning_readiness validator, and can inspect bookings().lifetime_compatibility to
+explain blocked relationships. It must not bypass the repository using raw SQL
+current pointers. Valid same-lifetime reinstatement is unchanged, but cannot bypass
+a booking-level collision. There is no automatic resolution/reissue graph.
+
+New blocked revisions retain links to the sibling-coupon events proving the
+booking-wide collision. Message/event IDs, stored evidence JSON, provenance, and
+existing revisions are not rewritten. No new tables, migration edits or changes to
+resync handling or reprojection scope were needed. Existing databases need no
+schema upgrade; subsequent successful syncs persist the constrained projections.
+
+Files changed for correction 2: booking.py, booking_repository.py and this plan.
+Added tests/test_v9_booking_lifetimes.py with 15 focused tests for A-J, independent
+PNRs, unattributed evidence, history preservation and pre-correction read safety.
+The inherited sync_failed()/resync issue remained OPEN at correction 2 completion.
+It is addressed by the separately authorized correction 3 below. Do not commit,
+push or begin Phase 5 without the user's next instruction.
+
+Correction 2 verification (2026-09-11): 15 focused lifetime tests passed in 1.48
+seconds; all 75 Phase 4-focused tests passed in 7.19 seconds. Complete suite:
+**311 tests and 245 subtests passed in 46.45 seconds**, no failures or skips.
+Diff/whitespace checks passed, including untracked correction files. Migration 2
+checksum is unchanged. Branch remains feature/v9-live-replanning and HEAD remains
+1f71d3b33aae6aa9bb9538f380a7e3467177eb83. Status: modified plan plus eight untracked
+Phase 4 files; nothing staged, committed or pushed.
+
+### Pre-commit correction 3: persistent full-resync requirement
+
+BookingRepository now overrides sync_failed(provider, account_id, error=..., as_of=...)
+with the unchanged Phase 3 call signature. It and record_sync_failure() delegate
+to one private transactional implementation. The legacy-shaped call records against
+the current checkpoint under BEGIN IMMEDIATE and preserves its out-of-order error;
+the application-shaped call retains expected-checkpoint comparison and ignores stale
+failures. Both validate scope/error/time and apply the same monotonic flag rule:
+existing requirement OR newly reported CURSOR_EXPIRED. Existing migration-1
+CURSOR_EXPIRED error evidence is included before the latest failure JSON is replaced.
+The inherited normal-dispatch bypass is therefore removed without removing the API.
+
+NORMAL becomes FULL_RESYNC_REQUIRED on CURSOR_EXPIRED. All subsequent failures
+preserve that requirement, including unavailable/auth/transient errors, timeout,
+pagination, extraction, reconciliation, projection and database failure. Repeated
+expiration is idempotent. The cursor and last successful time are retained.
+The provider-neutral contract continues using CURSOR_EXPIRED for expired/invalid
+cursors that require full recovery; no new provider error enum or SDK was introduced.
+Timeout exceptions retain the existing safe INVALID_RESPONSE mapping, which cannot
+clear an existing requirement.
+
+An ordinary incremental attempt is blocked by MailSynchronization before source
+I/O while recovery is required. commit_sync() independently rejects incremental
+completion under that requirement. Its final SQL flag update now explicitly clears
+an existing flag only when full=True; ordinary incremental success cannot clear it.
+Recovery means a qualifying full batch assembled/validated by MailSynchronization
+with cursor=None and all pages completed, followed by successful evidence,
+projection and cursor commit. The flag clears in that same transaction. Failure
+even at the final flag write rolls the whole recovery back. A successful unrelated
+observation or another provider/account's full sync does not establish recovery.
+
+The persistent flag survives restart. Phase 3 observation/retrieval methods remain
+inherited and operational through BookingRepository. LiveRepository itself and
+both migrations/checksums are unchanged. No booking-lifetime, cancellation,
+reinstatement, reprojection, worker, MCP or Phase 5 behavior was changed.
+
+Changed for correction 3: travel_agent/live/booking_repository.py and this plan.
+Added tests/test_v9_resync_requirement.py with 18 focused tests covering A-K,
+upgrade fallback, stale conditional failure, out-of-order rejection, account
+isolation and transactional recovery rollback. All three requested pre-commit
+corrections are implemented; architectural review is still required before commit.
+
+Correction 3 verification: 18 focused resync tests passed in 2.06 seconds; all 93
+Phase 4-focused tests passed in 6.34 seconds. Complete suite: **329 tests and 245
+subtests passed in 49.33 seconds**, no failures or skips. Diff/whitespace checks
+passed; migration 1 and migration 2 checksums remain unchanged. Branch/HEAD remain
+feature/v9-live-replanning / 1f71d3b33aae6aa9bb9538f380a7e3467177eb83.
+Status: modified plan plus nine untracked Phase 4 files; nothing staged, committed
+or pushed. No Phase 5 implementation was begun.
