@@ -1,4 +1,4 @@
-"""Checkpoint 1 offline demo. Run: python -B demo/cmu_demo.py from the repo root."""
+"""Offline demo with observational search trace. Run: python -B demo/cmu_demo.py."""
 import json
 from pathlib import Path
 import sys
@@ -10,13 +10,14 @@ if __package__ in (None, ""):
 
 from travel_agent.composition import create_itinerary_service
 from travel_agent.itinerary.clock import FixedClock, TIME_BASIS, parse_local
+from demo.search_trace import TracedBeamSearchPlanner, render_trace
 
 
 def load_scenario(path=None):
     return json.loads(Path(path or Path(__file__).with_name("scenario.json")).read_text(encoding="utf-8"))
 
 
-def run_demo():
+def run_demo(*, traced=True):
     """Return real service evidence/results; all persistence is temporary."""
     scenario = load_scenario()
     with TemporaryDirectory(prefix="cmu-demo-") as directory:
@@ -31,11 +32,16 @@ def run_demo():
         )
         try:
             planner = service.travel_service.coordinator.planner
+            if traced:
+                planner = TracedBeamSearchPlanner(beam_width=planner.beam_width, depth=planner.depth,
+                                                 critic=planner.critic, policy=planner.policy)
+                service.travel_service.coordinator.planner = planner
             result = service.plan_booked_trip(selector={}, candidates=scenario["candidates"])
             if result["status"] != "COMPLETED":
                 raise RuntimeError(f"Demo planning did not complete: {result['status']}")
             return {"scenario": scenario, "booked_result": result,
-                    "beam_width": planner.beam_width, "depth": planner.depth}
+                    "beam_width": planner.beam_width, "depth": planner.depth,
+                    "trace": planner.stages if traced else []}
         finally:
             service.repository.close()
 
@@ -70,6 +76,8 @@ def render_demo(report):
               "", "HOST-STYLE CANDIDATES", "Rehearsed proposals, not live model output:"]
     for candidate in scenario["candidates"]:
         lines.append(f"{candidate['label']}: {candidate['leave_time']} - {candidate['summary']}")
+    if report["trace"]:
+        lines += ["", render_trace(report["trace"], report["beam_width"], report["depth"], result["finalists"])]
     lines += ["", "DETERMINISTIC EVALUATION",
               "ItineraryService -> TravelService -> Coordinator -> agents / existing planner.",
               f"Beam width {report['beam_width']}, depth {report['depth']} (two refinement rounds).",
