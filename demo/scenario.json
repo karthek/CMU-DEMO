@@ -1,0 +1,22 @@
+{
+  "user_goal": "Help me plan my departure for my booked ATL flight around my workday commitments.",
+  "as_of": "2026-09-16T12:00:00",
+  "itineraries": {
+    "source_id": "fixture",
+    "time_basis": "America/New_York",
+    "records": [{"itinerary_id": "CMU-DEMO-001", "segments": [
+      {"segment_id": "OUTBOUND", "flight_number": "DL1425", "departure_date": "2026-09-16", "origin": "ATL", "destination": "PHL", "scheduled_departure": "2026-09-16T19:00", "booking_status": "CONFIRMED"}
+    ]}]
+  },
+  "flights": {
+    "time_basis": "America/New_York",
+    "flights": [
+      {"flight_number": "DL1425", "origin": "ATL", "destination": "PHL", "departure_time": "2026-09-16T19:00", "boarding_time": "2026-09-16T18:30", "status": "ON TIME", "gate": "B18", "delay_minutes": 0}
+    ]
+  },
+  "candidates": [
+    {"label": "Host early", "leave_time": "2026-09-16T15:50", "summary": "Explore an early departure."},
+    {"label": "Host buffer", "leave_time": "2026-09-16T16:20", "summary": "Explore more airport buffer."},
+    {"label": "Host meeting", "leave_time": "2026-09-16T17:00", "summary": "Explore leaving after the leadership meeting."}
+  ]
+}
