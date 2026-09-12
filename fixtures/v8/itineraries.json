@@ -1,0 +1,10 @@
+{
+  "source_id": "fixture",
+  "time_basis": "America/New_York",
+  "records": [
+    {"itinerary_id": "TRIP-001", "segments": [
+      {"segment_id": "OUTBOUND", "flight_number": "DL1425", "departure_date": "2026-09-11", "origin": "ATL", "destination": "PHL", "scheduled_departure": "2026-09-11T19:00", "booking_status": "CONFIRMED"},
+      {"segment_id": "RETURN", "flight_number": "DL1426", "departure_date": "2026-09-14", "origin": "PHL", "destination": "ATL", "scheduled_departure": "2026-09-14T18:00", "booking_status": "CONFIRMED"}
+    ]}
+  ]
+}

@@ -1,0 +1,2 @@
+# Optional connection layer only; the travel core needs no third-party packages.
+mcp==2.2.0

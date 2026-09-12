@@ -1,0 +1,138 @@
+{
+  "provenance": {
+    "source": "production v7 tag",
+    "commit": "08dcb2c0be6292c5ca4aa35d94f0663240376abc",
+    "path": "travel_agent/adapters/mcp_server.py",
+    "blob": "c1e60f36eb8a6f707a89d8518215877e54c36cbd",
+    "purpose": "Frozen exact V7 MCP input/output schema compatibility reference. Do not silently update when the current MCP implementation changes."
+  },
+  "tools": [
+    {
+      "name": "get_trip_context",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "flight_number": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date": {
+            "type": "string",
+            "description": "Travel date in YYYY-MM-DD format."
+          }
+        },
+        "required": [
+          "flight_number",
+          "date"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "Trip context returned by get_trip_context: flight, calendar_events, airport_travel_minutes, security_minutes, gate_walk_minutes, and preferred_buffer_minutes. Pass it unchanged for planning against those facts."
+      }
+    },
+    {
+      "name": "evaluate_trip_plans",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "object",
+            "description": "Trip context returned by get_trip_context: flight, calendar_events, airport_travel_minutes, security_minutes, gate_walk_minutes, and preferred_buffer_minutes. Pass it unchanged for planning against those facts."
+          },
+          "candidates": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "leave_time": {
+                      "type": "string",
+                      "description": "Local ISO date/time without timezone, e.g. 2026-09-11T16:20."
+                    },
+                    "summary": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "leave_time",
+                    "summary"
+                  ],
+                  "additionalProperties": true
+                },
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "context"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "enum": [
+              "deterministic",
+              "host-assisted"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PLAN_FOUND",
+              "NO_FEASIBLE_PLAN"
+            ]
+          },
+          "selected_plan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Feasible plan with core-computed feasibility, score_breakdown and calendar_conflicts; null if bounded search found none."
+          },
+          "diagnostics": {
+            "type": "object",
+            "description": "Explored-candidate scope/count; best infeasible candidate is diagnostic only."
+          },
+          "finalists": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "mode",
+          "selected_plan",
+          "finalists",
+          "recommendation",
+          "diagnostics"
+        ]
+      }
+    }
+  ]
+}

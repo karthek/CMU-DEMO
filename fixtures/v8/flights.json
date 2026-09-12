@@ -1,0 +1,7 @@
+{
+  "time_basis": "America/New_York",
+  "flights": [
+    {"flight_number": "DL1425", "origin": "ATL", "destination": "PHL", "departure_time": "2026-09-11T19:00", "boarding_time": "2026-09-11T18:30", "status": "ON TIME", "gate": "B18", "delay_minutes": 0},
+    {"flight_number": "DL1426", "origin": "PHL", "destination": "ATL", "departure_time": "2026-09-14T18:00", "boarding_time": "2026-09-14T17:30", "status": "ON TIME", "gate": "A12", "delay_minutes": 0}
+  ]
+}
