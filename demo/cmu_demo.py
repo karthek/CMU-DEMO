@@ -18,9 +18,13 @@ def load_scenario(path=None):
     return json.loads(Path(path or Path(__file__).with_name("scenario.json")).read_text(encoding="utf-8"))
 
 
-def run_demo(*, traced=True):
+def run_demo(*, traced=True, candidates=None):
     """Return real service evidence/results; all persistence is temporary."""
     scenario = load_scenario()
+    if candidates is not None:
+        # Demo rehearsal input override only; production service still validates.
+        from copy import deepcopy
+        scenario["candidates"] = deepcopy(candidates)
     with TemporaryDirectory(prefix="cmu-demo-") as directory:
         root = Path(directory)
         for name in ("itineraries", "flights"):

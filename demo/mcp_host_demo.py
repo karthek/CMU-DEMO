@@ -5,6 +5,7 @@ The numeric baseline below is a rehearsal assertion, never a computed/replaced
 answer. Displayed evaluations always come from MCP structured_content.
 """
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -14,15 +15,18 @@ if __package__ in (None, ""):
 
 from jsonschema import Draft202012Validator
 from mcp.client import Client
-from mcp.client.stdio import StdioServerParameters
+from mcp.client.stdio import StdioServerParameters, stdio_client
 from demo.hitl import propose_calendar_changes, render_hitl
+from demo.rehearsal_policy import (RehearsalFailure, InfrastructureFailure,
+                                   AuthoritativeFailure, CompatibilityFailure, validate_baseline)
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TOOLS = {"get_trip_context", "evaluate_trip_plans", "monitor_trips", "plan_booked_trip"}
 
 
-class RehearsalFailure(RuntimeError):
-    pass
+# Frozen CP4 input/output schemas, canonical JSON sorted by key. This detects
+# compatibility drift; it does not replace or modify the server's public schemas.
+SCHEMA_DIGEST = "ae6a91f831baada793a01035f14fa639cffd036c1d197966ef3a9ec33c3e96ac"
 
 
 def server_parameters():
@@ -31,33 +35,45 @@ def server_parameters():
 
 
 async def checked_call(client, tools, name, arguments):
+    tool = tools[name]
     try:
-        tool = tools[name]
         Draft202012Validator(tool.input_schema).validate(arguments)
+    except Exception as exc:
+        raise AuthoritativeFailure(f"{name}: planning input validation failed; no fallback") from exc
+    try:
         response = await client.call_tool(name, arguments)
         if response.is_error:
-            raise RehearsalFailure(f"{name}: MCP tool returned an error")
+            raise AuthoritativeFailure(f"{name}: MCP tool returned an error; no fallback")
         payload = response.structured_content
         if not isinstance(payload, dict) or tool.output_schema is None:
-            raise RehearsalFailure(f"{name}: missing structured result/schema")
+            raise InfrastructureFailure(f"{name}: missing structured result/schema")
         Draft202012Validator(tool.output_schema).validate(payload)
         return payload
     except RehearsalFailure:
         raise
     except Exception as exc:
-        raise RehearsalFailure(f"{name}: call or schema validation failed") from exc
+        raise InfrastructureFailure(f"{name}: transport or response structure failure") from exc
 
 
-async def rehearse(parameters=None):
+async def rehearse(parameters=None, *, errlog=None):
     scenario = json.loads((ROOT / "demo/scenario.json").read_text(encoding="utf-8"))
     stage = "server startup / connection"
     try:
-        async with asyncio.timeout(45), Client(parameters or server_parameters()) as client:
+        transport = parameters or server_parameters()
+        if errlog is not None:
+            transport = stdio_client(transport, errlog=errlog)
+        async with asyncio.timeout(45), Client(transport) as client:
             stage = "tool discovery"
             discovery = await client.list_tools()
             tools = {tool.name: tool for tool in discovery.tools}
             if len(discovery.tools) != len(EXPECTED_TOOLS) or set(tools) != EXPECTED_TOOLS:
-                raise RehearsalFailure("tool discovery: expected exactly the four existing travel tools")
+                if EXPECTED_TOOLS - set(tools):
+                    raise InfrastructureFailure("tool discovery: required travel tool unavailable")
+                raise CompatibilityFailure("tool discovery: unexpected tool surface; no fallback")
+            digest = hashlib.sha256(json.dumps({t.name: [t.input_schema, t.output_schema]
+                for t in discovery.tools}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            if digest != SCHEMA_DIGEST:
+                raise CompatibilityFailure("MCP schema compatibility changed; no fallback")
             segment = scenario["itineraries"]["records"][0]["segments"][0]
             stage = "get_trip_context"
             context = await checked_call(client, tools, stage,
@@ -65,28 +81,36 @@ async def rehearse(parameters=None):
             stage = "evaluate_trip_plans"
             result = await checked_call(client, tools, stage,
                 {"context": context, "candidates": scenario["candidates"]})
+            validate_baseline(result)
             stage = "plan_booked_trip"
             booked = await checked_call(client, tools, stage,
                 {"selector": {}, "candidates": scenario["candidates"]})
             stage = "authoritative baseline validation"
             if (booked["status"] != "COMPLETED" or booked["run"]["context"] != context
                 or booked["run"]["planning_result"] != result or booked["as_of"] != scenario["as_of"]):
-                raise RehearsalFailure("booked-trip/context evaluation parity failed")
-            expected = [("2026-09-16T16:20", 76.8), ("2026-09-16T16:10", 76.0)]
-            if (result["status"] != "PLAN_FOUND" or
-                [(p["leave_time"], p["score"]) for p in result["finalists"]] != expected
-                or result["selected_plan"] != result["finalists"][0]):
-                raise RehearsalFailure("authoritative result differs from CP1-CP3 baseline")
+                raise AuthoritativeFailure("booked-trip/context evaluation parity failed; no fallback")
             proposals = propose_calendar_changes(context, result, scenario["calendar_proposal_slots"],
                                                  as_of=scenario["as_of"])
             if not proposals:
-                raise RehearsalFailure("expected demo governance proposal missing")
+                raise AuthoritativeFailure("expected demo governance proposal missing; no fallback")
             return {"context": context, "planning_result": result, "booked_result": booked,
                     "proposals": proposals, "tools": tuple(sorted(tools))}
     except RehearsalFailure:
         raise
     except Exception as exc:
-        raise RehearsalFailure(f"{stage}: rehearsal failed ({type(exc).__name__})") from exc
+        # Async transports wrap body failures in ExceptionGroups. Never turn a
+        # wrapped business/compatibility failure into fallback permission.
+        def leaves(error):
+            if isinstance(error, BaseExceptionGroup):
+                return [leaf for child in error.exceptions for leaf in leaves(child)]
+            return [error]
+        failures = leaves(exc)
+        for kind in (CompatibilityFailure, AuthoritativeFailure, RehearsalFailure):
+            for failure in failures:
+                if isinstance(failure, kind):
+                    raise failure from exc
+        kind = AuthoritativeFailure if stage == "authoritative baseline validation" else InfrastructureFailure
+        raise kind(f"{stage}: rehearsal failed ({type(exc).__name__})") from exc
 
 
 def render_host(report):
