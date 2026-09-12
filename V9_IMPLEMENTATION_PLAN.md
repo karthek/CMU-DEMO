@@ -1,6 +1,57 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint: Phase 5D-A approved freeze
+## Current continuation checkpoint: Phase 5E-A Graph Mail contract review
+
+Review date 2026-09-12. Verified repository model_agnostic_travel_agent_v1,
+branch `feature/v9-live-replanning`, HEAD
+`0717350898aa1ce1b1d5c4cc7d0244bb489db79f`, and initially clean worktree.
+Phase 5D-A is frozen and committed. Phase 5D-B real-airline validation remains
+deferred until sanitized, format-faithful actual evidence is supplied.
+
+Conclusion: **A. PHASE 5E-A GRAPH MAIL CONTRACT APPROVED FOR COMMIT**.
+Documentation/architecture review only; no Graph runtime implementation or commit
+is authorized by this conclusion. No source, tests, dependencies or migrations change.
+Official Microsoft references, review date, documented behavior versus project
+inferences, and implementation gates are recorded in
+[V9_PHASE_5E_A_GRAPH_MAIL_CONTRACT.md](V9_PHASE_5E_A_GRAPH_MAIL_CONTRACT.md).
+
+The proposed source uses existing OUTLOOK_MAIL identity with immutable Graph IDs,
+verified cloud/tenant/principal account binding and the frozen mail-evidence/v1
+content hash. Graph message delta is per folder: one account cursor can contain
+a bounded vector of exact complete per-folder delta URLs in existing cursor TEXT.
+No migration, booking identity change or provider-neutral port extension is needed.
+
+Selected profile covers normal non-hidden physical primary-mailbox folders,
+including Inbox/Archive/user folders/Junk/Deleted Items, excluding drafts and search
+aliases. It uses bounded unfiltered metadata delta bootstrap and local configurable
+365-day body admission, avoiding the documented filtered-delta 5,000-message cap.
+RetainedMailIdentityLookup allows continued processing of previously retained old
+IDs; never-retained old IDs are not newly admitted by later delta/move mentions.
+Folder removals are resolved at mailbox scope before emitting visibility changes;
+mail removal never cancels travel. Scope changes/expired links require whole-vector
+full resync via existing persistent FULL_RESYNC_REQUIRED. Only complete atomic
+evidence/projection/cursor commits clear a qualifying full resync.
+
+Body-only full text/HTML normalization, From-based sender, delegated Mail.Read,
+runtime-only credentials, safe URL validation, actual-byte/attempt/deadline bounds
+and zero automatic retries are the proposed 5E-B boundary. A bounded quiet validation
+pass detects observed races; it is not an all-folder transactional snapshot or
+real-time completeness guarantee. Large/active mailboxes may fail within bounds.
+Account-class binding, exact safe URL forms and unsupported content handling require
+offline proof before claiming corresponding support. No live conformance is claimed.
+
+Regression confirmation: **317 passed + 23 subtests in 18.84s**, comprising 145
+relevant mail/repository/provider cases, 130 Gmail cases and 42 framework cases.
+No complete-suite rerun for documentation-only edits; frozen full baseline remains
+508 passed + 245 subtests. Whitespace/security/scope checks: passed; no secrets, PII, generated artifacts or unrelated changes found.
+V8 source/tests and all frozen Gmail behavior remain unchanged.
+
+5E-B may be considered only after separate implementation authorization and the
+contract's offline tests/gates. No OAuth, Graph client/source, calendar, workers,
+MCP/HITL, operational providers or replanning implementation in 5E-A.
+Do not commit, push or begin 5E-B in this slice.
+
+## Phase 5D-A freeze checkpoint (committed)
 
 The user approved the multi-airline deterministic extraction framework for freeze
 on 2026-09-12 and split real-airline evidence validation into deferred Phase 5D-B.
