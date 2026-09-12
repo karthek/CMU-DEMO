@@ -1,6 +1,51 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint: Phase 5E-B Graph Mail adapter (uncommitted)
+## Current continuation checkpoint: Phase 5F-A calendar read contract (uncommitted)
+
+Verified repository model_agnostic_travel_agent_v1, branch
+`feature/v9-live-replanning`, clean starting worktree and HEAD
+`28ea3af8e47630a366f7029dccb1d5de1eb03d32` on 2026-09-12.
+Phase 5E-B is frozen. The user authorized only the provider-neutral calendar read
+contract, focused deterministic conflict evaluator and fixture provider in 5F-A.
+
+Conclusion: **A. PHASE 5F-A CALENDAR READ CONTRACT APPROVED FOR COMMIT**.
+No commit or push is authorized in this run. See
+[V9_PHASE_5F_A_CALENDAR_READ_CONTRACT.md](V9_PHASE_5F_A_CALENDAR_READ_CONTRACT.md).
+
+Added live.calendar normalized scope/event/occurrence, aware timed/civil all-day
+periods, bounded complete query snapshots, the new read-only CalendarProvider and
+CalendarConflictEvaluator. Added opt-in CalendarReadAgent and a small immutable
+FixtureCalendarProvider. Known busy commitments constrain the caller-supplied
+travel interval; declined/cancelled/free events do not. Tentative/all-day policies
+are explicit. Half-open boundaries, stable original occurrence identity, unknown
+participation, missing times and stale data are deterministic and conservative.
+Structured conflict tokens prepare later active-plan comparison without wiring it.
+
+Existing V8 CalendarAgent/TripContext and the earlier live.providers calendar
+scaffold remain unchanged. New adapters explicitly import live.calendar.CalendarProvider;
+they do not silently substitute aware evidence into frozen V8 naive-time models.
+No legacy permission flag is promoted into future action authority. No transportation
+timing is calculated by the new calendar layer.
+
+Validation: **48 new calendar tests**; calendar/planner/V7/V8/time/replanning
+regressions **68 passed + 61 subtests**; existing V9 provider contracts **4 passed**.
+New calendar plus provider-contract run: **52 passed in 0.45s**. Complete suite:
+**749 passed + 245 subtests in 37.40s**, no failures or skips.
+Final whitespace/diff, secrets/PII and artifact checks passed. All existing source/tests
+and all 62 V8 Python source/test files remain unchanged; the index is empty.
+
+This is normalized read/evaluation infrastructure, not live Google/Graph calendar
+compatibility. No API, HTTP, OAuth, calendar writes, HITL workflow, migration,
+dependency, host intake, SDK, MCP, worker/scheduler or replanning wiring was added.
+Phase 5F-B requires separate adapter design/implementation authorization and review
+of account/permissions, recurrence, timezone and complete bounded window coverage.
+Real airline evidence validation (5D-B) remains deferred as previously agreed.
+
+**Calendar reads may be autonomous. Calendar mutations may NEVER be autonomous.**
+Future mutations belong to a separate CalendarActionService/HITL boundary.
+Agent prepares. Human commits. Do not begin 5F-B in this run.
+
+## Phase 5E-B Graph Mail adapter freeze checkpoint (committed)
 
 The user authorized the Phase 5E-A documentation freeze and then Phase 5E-B
 implementation on 2026-09-12. Phase 5E-A was committed as
@@ -9,8 +54,10 @@ implementation on 2026-09-12. Phase 5E-A was committed as
 Only the approved two documentation files were committed; status was clean afterward.
 Branch remains `feature/v9-live-replanning`. Nothing was pushed.
 
-Conclusion: **A. PHASE 5E-B GRAPH MAIL ADAPTER APPROVED FOR COMMIT**.
-Phase 5E-B remains uncommitted and requires separate commit authorization.
+The subsequent user freeze authorization committed the exact eight reviewed files
+as `28ea3af8e47630a366f7029dccb1d5de1eb03d32`, with message
+`V9 Phase 5E-B: add Microsoft Graph mail adapter`. Post-commit status was clean;
+the rerun full baseline was 701 passed + 245 subtests. Nothing was pushed.
 See [V9_PHASE_5E_B_GRAPH_MAIL_ADAPTER.md](V9_PHASE_5E_B_GRAPH_MAIL_ADAPTER.md)
 for architecture, exact runtime ports, supported scope, limits and validation.
 
@@ -39,11 +86,13 @@ fictional Northstar evidence, never real airline messages or private mailbox dat
 Final whitespace/diff, secrets/PII, artifact, dependency and migration checks passed.
 All 62 V8 Python source/test files and all existing source/tests remain unchanged.
 
-Next recommended slice: separately review and validate host credential/transport
-integration before live Graph access. Phase 5D-B remains deferred pending sanitized,
+The prior recommendation to validate host credential/transport integration remains
+a prerequisite for live Graph access. The user selected calendar reads as the next
+implementation slice, starting with the 5F-A contract above. Phase 5D-B remains deferred pending sanitized,
 format-faithful actual airline messages. No calendar, worker, MCP, operational
 provider, airline parser, V8 activation or real-time replanning work has begun.
-Do not commit Phase 5E-B, push or begin calendar work in this slice.
+The previous no-commit/no-calendar restriction was superseded only by the explicit
+5E-B freeze and subsequent bounded 5F-A authorization. No live Graph access began.
 
 ## Phase 5E-A contract review checkpoint (now frozen and committed)
 
@@ -358,7 +407,7 @@ configuration stores environment-variable references, not resolved secrets.
 |---|---|---|
 | MailSource | GmailMailSource, OutlookMailSource (Graph) | Normalized messages and opaque incremental cursors |
 | ItineraryExtractor | Deterministic airline templates | Sender/domain, subject, structured text/HTML, regex and airport/flight/time validation |
-| CalendarProvider | GoogleCalendarProvider, OutlookCalendarProvider (Graph) | Normalized events/permissions/version; conditional execution and read-back |
+| CalendarProvider | GoogleCalendarProvider, OutlookCalendarProvider (Graph) | Bounded normalized read snapshots; future mutations use separate CalendarActionService/HITL |
 | FlightProvider | FlightAwareAeroApiProvider | Flight operational observations, nullable terminal/gate |
 | TrafficProvider | GoogleRoutesProvider | Road estimates for requested future departure and current near-departure estimates |
 
