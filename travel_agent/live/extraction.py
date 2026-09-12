@@ -63,6 +63,9 @@ class NorthstarRule:
     Sender checking is a template constraint, not email authentication evidence.
     """
     rule_id = "synthetic-northstar/v1"
+    carrier = "NS"
+    family = "synthetic-northstar"
+    event_types = frozenset((ExtractionState.BOOKING, ExtractionState.CHANGE, ExtractionState.CANCELLATION))
     subjects = {"Northstar Air booking confirmation": ExtractionState.BOOKING,
                 "Northstar Air schedule change": ExtractionState.CHANGE,
                 "Northstar Air flight cancellation": ExtractionState.CANCELLATION}
@@ -134,20 +137,14 @@ class NorthstarRule:
 
 
 class ItineraryExtractor:
-    def __init__(self, rules: tuple[ExtractionRule, ...] | None = None):
-        self.rules = (NorthstarRule(),) if rules is None else rules
-        if len({r.rule_id for r in self.rules}) != len(self.rules):
-            raise ValueError("Unique extraction rule identities required")
+    def __init__(self, rules: tuple[ExtractionRule, ...] | None = None, *, registry=None):
+        from travel_agent.live.template_registry import TemplateRegistry
+        if registry is not None and rules is not None:
+            raise ValueError("Choose registry or legacy rules")
+        self.registry = TemplateRegistry.from_rules((NorthstarRule(),) if rules is None else rules) if registry is None else registry
+        if not isinstance(self.registry, TemplateRegistry):
+            raise ValueError("Typed template registry required")
+        self.rules = tuple(t.parser for t in self.registry.templates)
 
     def extract(self, message: MailMessage) -> ExtractionResult:
-        if not isinstance(message, MailMessage):
-            raise ValueError("Normalized MailMessage required")
-        matches = [rule for rule in self.rules if rule.matches(message)]
-        if len(matches) == 1:
-            return matches[0].extract(message)
-        if len(matches) > 1:
-            return ExtractionResult(ExtractionState.UNRESOLVED, message, None, issues=("AMBIGUOUS_TEMPLATE",))
-        content = "\n".join((message.subject, *message.bodies))
-        suspect = re.search(r"\b(flight|itinerary|boarding|airline|booking|reservation)\b", content, re.I)
-        state = ExtractionState.UNRESOLVED if suspect else ExtractionState.NOT_TRAVEL
-        return ExtractionResult(state, message, None, issues=("UNSUPPORTED_TEMPLATE",) if suspect else ())
+        return self.registry.extract(message)

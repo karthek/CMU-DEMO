@@ -1,6 +1,101 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint (Phase 5C freeze)
+## Current continuation checkpoint: Phase 5D-A approved freeze
+
+The user approved the multi-airline deterministic extraction framework for freeze
+on 2026-09-12 and split real-airline evidence validation into deferred Phase 5D-B.
+This record accompanies the Phase 5D-A commit on `feature/v9-live-replanning`,
+whose parent is `5584fb472e9c2d3e15302718820038fba60afd7b`. The expected uncommitted
+framework, tests, fixtures and existing Phase 5D documentation were preserved.
+Phase 5C remains frozen and committed.
+
+**Phase 5D-A: APPROVED FOR FREEZE.** The provider-neutral TemplateRegistry supports
+multiple versioned families, deterministic selection and fail-closed ambiguity.
+The immutable TemplateEventAuthorityPolicy grants exact versions specific events,
+independent of Gmail/Outlook. Parser registration grants no canonical mutation
+permission. Unknown templates cannot mutate canonical travel. Synthetic Northstar
+behavior/event bytes, lifetime/reinstatement, immutable evidence and V7/V8 behavior
+remain intact. Adding a family requires its deterministic parser, sanitized fixtures,
+focused tests, registry registration and separately reviewed authority grant; it
+requires no provider, BookingRepository internals or planning architecture changes.
+
+**Phase 5D-B: DEFERRED until actual evidence is supplied.** Public airline guidance
+establishes business concepts but cannot supply the stable complete email grammar
+needed here. Public-page template searching is closed; no Delta, American or United
+support is claimed. Future evidence must derive from actual user-owned booking,
+change or cancellation mail, sanitized without destroying sender domain, subject
+pattern, headings, field labels/order, HTML/text structure, flight/date/airport
+placement or explicit event markers. Remove names, PNRs, ticket/loyalty numbers,
+personal email addresses, payment/card data, addresses, phones, QR/barcode values
+and other identifiers. A synthetic reconstruction is not real evidence.
+
+Real-airline support is intentionally unclaimed until a sanitized, format-faithful
+message from the target template family is available for deterministic validation.
+
+Approved capstone claim:
+
+> The itinerary extraction layer is airline-agnostic at its core. Airline-specific
+> formats plug into a versioned deterministic template registry and require explicit
+> event authority. The framework is validated with deterministic test families;
+> real-airline compatibility is claimed only after format-faithful evidence is
+> validated.
+
+Freeze validation (2026-09-12): framework 42 passed; relevant extraction,
+reconciliation, synchronization and repository tests 145 passed + 23 subtests;
+Phase 5C Gmail 130 passed; complete suite 508 passed + 245 subtests in 78.21s, no failures or skips.
+Whitespace/diff and secrets/PII/generated-artifact/unrelated-change review:
+passed. No dependency or migration added; V8 source/tests unchanged.
+The authorized commit message is
+`V9 Phase 5D-A: add multi-airline extraction and authority framework`.
+No push, Phase 5D-B or Phase 5E work is included. No universal airline support,
+production extraction coverage or completed V9 is claimed.
+See [V9_PHASE_5D_AIRLINE_TEMPLATE.md](V9_PHASE_5D_AIRLINE_TEMPLATE.md) for exact APIs,
+extension procedure, current fictional tests and deferred evidence requirements.
+
+## Historical single-family Phase 5D checkpoint (superseded by current scope)
+
+Verified repository model_agnostic_travel_agent_v1, branch feature/v9-live-replanning,
+HEAD 5584fb472e9c2d3e15302718820038fba60afd7b and clean worktree before this slice.
+Phase 5C is frozen and committed. The user authorized one bounded real-airline
+template only, with explicit stops for unsafe identity/authority/reissue semantics.
+
+Decision: **B. PHASE 5D BLOCKED**. No real template passed the eligibility gate.
+The candidate reviewed was American Airlines aa.com award-trip correspondence;
+official guidance documents a confirmation-code email and a changed-ticket email,
+but not an exact matched family or safe stable-coupon/lifetime/sequence mapping.
+No sender/subject/body grammar was invented or installed. Repository fixtures are
+fictional Northstar only; no real user/private mailbox data was used.
+
+The existing booking_event converter assigns authority only to the synthetic
+Northstar rule. A new ExtractionRule can label facts but cannot by itself supply
+EventAuthority through that boundary. Two transient synthetic repository probes
+confirmed that BOOKING -> CHANGE and BOOKING -> CANCELLATION under a different
+rule_id produce UNRESOLVED / CONFLICTING_EVENT_HISTORY and deny planning while
+preserving evidence. The frozen projector is behaving correctly; do not weaken it.
+
+Smallest next step: review a source-grounded real-template identity/authority
+contract and, only if it maps safely to existing lifetime/sequence semantics,
+approve a narrow versioned event-construction extension and explicit replay policy.
+Choose another verified family if necessary; never invent ticket continuity,
+traveler identity, supersession or synthetic order. No schema redesign is proposed
+as an automatic next action. Details and candidate evidence are in
+[V9_PHASE_5D_AIRLINE_TEMPLATE.md](V9_PHASE_5D_AIRLINE_TEMPLATE.md).
+
+Only this checkpoint and the new Phase 5D review document change. No parser, test,
+fixture, dependency, migration, Gmail, core semantic, V8 or Phase 5E changes.
+Nothing staged, committed or pushed. Stop for the prerequisite contract decision.
+
+Validation: no new real-template tests (selection blocked); existing template smoke
+**10 passed + 23 subtests in 0.14s**; extraction/reconciliation and relevant
+synchronization/booking/repository regressions **145 passed + 23 subtests in 9.41s**;
+Phase 5C Gmail **130 passed in 3.37s**; complete suite **466 passed + 245 subtests
+in 42.98s**, no failures/skips. Both synthetic diagnostic scenarios passed.
+Whitespace/diff and PII/secret/artifact/scope inspection passed. Source/tests/fixtures
+and dependencies are unchanged against HEAD; existing V8 source/tests are unchanged
+against v8. Final status: modified V9_IMPLEMENTATION_PLAN.md; untracked
+V9_PHASE_5D_AIRLINE_TEMPLATE.md; index empty; HEAD remains the Phase 5C freeze.
+
+### Phase 5C freeze checkpoint (committed)
 
 Phase 5B is frozen and committed at
 `596e76559f91460d33cf69c46783fada71fac3e1` on

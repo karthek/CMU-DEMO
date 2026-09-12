@@ -14,6 +14,7 @@ from travel_agent.live.reconciliation import reconcile
 from travel_agent.live.repository import LiveRepository, encode
 from travel_agent.live.observations import text
 from travel_agent.live.time import parse_instant, utc
+from travel_agent.live.template_authority import DEFAULT_TEMPLATE_EVENT_POLICY, TemplateEventAuthorityPolicy
 
 
 _CURRENT_CHECKPOINT = object()
@@ -45,7 +46,10 @@ def encode_event(event):
 
 
 class BookingRepository(LiveRepository):
-    def __init__(self, path, *, as_of, backup_path=None):
+    def __init__(self, path, *, as_of, backup_path=None, event_policy=DEFAULT_TEMPLATE_EVENT_POLICY):
+        if not isinstance(event_policy, TemplateEventAuthorityPolicy):
+            raise ValueError("Immutable template authority policy required")
+        self._event_policy = event_policy
         self.path = Path(path).resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(self.path, timeout=0)
@@ -103,6 +107,14 @@ class BookingRepository(LiveRepository):
     def unresolved_identity(self, *, authorized_travelers):
         return reconcile(self.extractions(), authorized_travelers=authorized_travelers).unresolved
 
+    def template_authority_decisions(self):
+        """Explain retained extraction under this immutable deployment policy.
+
+        This is a current policy evaluation, not a claim of historical policy
+        revocation. Existing immutable event/evidence links remain the event audit.
+        """
+        return tuple((r.message.identity, self._event_policy.decision(r)) for r in self.extractions())
+
     def resync_required(self, provider, account_id):
         row = self.connection.execute("SELECT resync_required FROM provider_resync_requirements WHERE provider=? AND account_id=?", (provider, account_id)).fetchone()
         # Preserve cursor-expired evidence when upgrading an existing Phase 3 DB.
@@ -145,7 +157,16 @@ class BookingRepository(LiveRepository):
                 (provider, account_id, int(needs_resync)))
 
     def _project_all(self, *, authorized_travelers, as_of, projector):
-        groups = reconcile(self.extractions(), authorized_travelers=authorized_travelers)
+        # Authorize before reconciliation can create canonical booking/segment rows.
+        # Denied extraction stays immutable/queryable; it never poisons or cancels
+        # an existing authorized projection merely by describing different facts.
+        eligible, events = [], {}
+        for extraction in self.extractions():
+            event = booking_event(extraction, policy=self._event_policy)
+            if event is not None:
+                eligible.append(extraction)
+                events[extraction.message.identity] = event
+        groups = reconcile(tuple(eligible), authorized_travelers=authorized_travelers)
         for group in groups.segments:
             carrier, reference, traveler, segment_reference = group.identity
             booking_id = stable_id(group.identity[:3])
@@ -154,7 +175,7 @@ class BookingRepository(LiveRepository):
             if not self.connection.execute("SELECT 1 FROM canonical_segments WHERE segment_id=?", (group.canonical_id,)).fetchone():
                 self.connection.execute("INSERT INTO canonical_segments VALUES(?,?,?)", (group.canonical_id, booking_id, segment_reference))
             for extraction in group.evidence:
-                event = booking_event(extraction)
+                event = events[extraction.message.identity]
                 payload = encode_event(event)
                 event_id = stable_id((group.canonical_id, payload))
                 if not self.connection.execute("SELECT 1 FROM booking_events WHERE event_id=?", (event_id,)).fetchone():

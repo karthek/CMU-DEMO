@@ -1,8 +1,8 @@
 """Offline booking truth: exact identity, explicit document order, pure projection.
 
-Northstar's synthetic authority extension uses a booking-lifetime reference and
-an airline sequence. Sequence orders evidence; only an explicit assertion linked
-to the cancelled state can reinstate travel. Mail metadata has no vote.
+Template event permission is checked before event construction. Document order
+still requires explicit lifetime evidence; only an explicit assertion linked to
+the cancelled state can reinstate travel. Mail metadata has no vote.
 """
 from dataclasses import dataclass
 from enum import StrEnum
@@ -65,51 +65,10 @@ class BookingEvent:
     reinstatement: Reinstatement | None = None
 
 
-def booking_event(result: ExtractionResult) -> BookingEvent | None:
-    if not result.eligible_for_reconciliation:
-        return None
-    authority, issues, reinstatement = None, (), None
-    # This extension is separately versioned; Phase 3 extraction JSON is untouched.
-    if result.rule_id == "synthetic-northstar/v1":
-        order_labels = ("Booking lifetime", "Airline sequence")
-        transition_labels = ("Travel state", "Reinstates lifetime",
-                             "Reinstates cancellation sequence", "Reinstates segment reference")
-        fields = {label: set() for label in (*order_labels, *transition_labels)}
-        for body in result.message.bodies:
-            for line in body.splitlines():
-                label, separator, value = line.partition(":")
-                if separator and label in fields:
-                    fields[label].add(value.strip())
-        if any(fields[label] for label in order_labels):
-            try:
-                if any(len(fields[label]) != 1 for label in order_labels):
-                    raise ValueError("Incomplete or conflicting authority")
-                lifetime = next(iter(fields["Booking lifetime"]))
-                sequence = next(iter(fields["Airline sequence"]))
-                if not re.fullmatch(r"0|[1-9][0-9]{0,9}", sequence):
-                    raise ValueError("Invalid sequence")
-                authority = EventAuthority(lifetime, int(sequence))
-            except ValueError:
-                issues = ("INVALID_EVENT_AUTHORITY",)
-        if any(fields[label] for label in transition_labels):
-            try:
-                if any(len(fields[label]) != 1 for label in transition_labels):
-                    raise ValueError("Incomplete or conflicting reinstatement")
-                values = {label: next(iter(fields[label])) for label in transition_labels}
-                sequence = values["Reinstates cancellation sequence"]
-                if values["Travel state"] != "REINSTATED" or not re.fullmatch(r"0|[1-9][0-9]{0,9}", sequence):
-                    raise ValueError("Explicit reinstatement required")
-                reinstatement = Reinstatement(EventAuthority(values["Reinstates lifetime"], int(sequence)),
-                    values["Reinstates segment reference"])
-                if (authority is None or authority.compare(reinstatement.cancelled_authority) != Order.NEWER
-                        or reinstatement.segment_reference != result.segment.segment_reference
-                        or result.state == ExtractionState.CANCELLATION):
-                    raise ValueError("Invalid reinstatement linkage")
-            except ValueError:
-                reinstatement = None
-                issues += ("INVALID_REINSTATEMENT",)
-            return BookingEvent(result.state, result.segment, authority, issues, "booking-events/v2", reinstatement)
-    return BookingEvent(result.state, result.segment, authority, issues)
+def booking_event(result: ExtractionResult, *, policy=None) -> BookingEvent | None:
+    """Construct only explicitly authorized exact-template events."""
+    from travel_agent.live.template_authority import DEFAULT_TEMPLATE_EVENT_POLICY
+    return (DEFAULT_TEMPLATE_EVENT_POLICY if policy is None else policy).construct(result)
 
 
 class LifetimeStatus(StrEnum):
