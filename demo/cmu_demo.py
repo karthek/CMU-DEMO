@@ -11,6 +11,7 @@ if __package__ in (None, ""):
 from travel_agent.composition import create_itinerary_service
 from travel_agent.itinerary.clock import FixedClock, TIME_BASIS, parse_local
 from demo.search_trace import TracedBeamSearchPlanner, render_trace
+from demo.hitl import propose_calendar_changes, render_hitl
 
 
 def load_scenario(path=None):
@@ -39,8 +40,12 @@ def run_demo(*, traced=True):
             result = service.plan_booked_trip(selector={}, candidates=scenario["candidates"])
             if result["status"] != "COMPLETED":
                 raise RuntimeError(f"Demo planning did not complete: {result['status']}")
+            proposals = propose_calendar_changes(
+                result["run"]["context"], result["run"]["planning_result"],
+                scenario.get("calendar_proposal_slots", []), as_of=scenario["as_of"])
             return {"scenario": scenario, "booked_result": result,
                     "beam_width": planner.beam_width, "depth": planner.depth,
+                    "calendar_proposals": proposals,
                     "trace": planner.stages if traced else []}
         finally:
             service.repository.close()
@@ -96,6 +101,8 @@ def render_demo(report):
         for conflict in selected["calendar_conflicts"]:
             lines.append(f"Calendar soft penalty: {conflict['title']} / {conflict['conflict_type']} "
                          f"({conflict['penalty']:+.2f})")
+    if report["calendar_proposals"]:
+        lines += ["", render_hitl(report["calendar_proposals"])]
     lines += ["", "BOUNDARIES / ASSUMPTIONS",
               "All trip, calendar, and transport evidence is FIXTURE data; local times use America/New_York.",
               "Gate feasibility is relative to configured timing assumptions, not proof of real-world arrival.",

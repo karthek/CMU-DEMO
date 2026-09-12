@@ -14,6 +14,9 @@
       {"flight_number": "DL1425", "origin": "ATL", "destination": "PHL", "departure_time": "2026-09-16T19:00", "boarding_time": "2026-09-16T18:30", "status": "ON TIME", "gate": "B18", "delay_minutes": 0}
     ]
   },
+  "calendar_proposal_slots": [
+    {"meeting_title": "Leadership Meeting", "current_start": "2026-09-16T16:30", "current_end": "2026-09-16T17:00", "allowed_start": "2026-09-16T15:15", "allowed_end": "2026-09-16T15:45"}
+  ],
   "candidates": [
     {"label": "Host early", "leave_time": "2026-09-16T15:50", "summary": "Explore an early departure."},
     {"label": "Host buffer", "leave_time": "2026-09-16T16:20", "summary": "Explore more airport buffer."},

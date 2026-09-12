@@ -12,6 +12,10 @@ from travel_agent.service import TravelService
 from copy import deepcopy
 from demo.search_trace import TracedBeamSearchPlanner, stage_rows, render_trace
 from travel_agent.contracts import context_from_dict
+from dataclasses import FrozenInstanceError, replace
+import pytest
+from demo.hitl import (CalendarChangeProposal, propose_calendar_changes,
+                       CALENDAR_MUTATIONS_REQUIRE_EXPLICIT_APPROVAL)
 
 
 def test_scenario_contains_proposals_and_evidence_only():
@@ -153,3 +157,87 @@ def test_rank_return_is_exact_production_object():
         assert planner._rank(None, []) is ranked
     planner.stages[0]["ranked"][0]["marker"].append("observer change")
     assert ranked == [{"marker": []}]
+
+
+def test_cp3_proposal_uses_authoritative_conflict_without_mutation():
+    report = run_demo()
+    run = report["booked_result"]["run"]
+    context, result = run["context"], run["planning_result"]
+    scenario = report["scenario"]
+    before = deepcopy((context, result, scenario))
+    proposals = propose_calendar_changes(context, result, scenario["calendar_proposal_slots"],
+                                         as_of=scenario["as_of"])
+    assert (context, result, scenario) == before
+    assert proposals == report["calendar_proposals"]
+    assert len(proposals) == 1
+    proposal = proposals[0]
+    conflict = result["selected_plan"]["calendar_conflicts"][0]
+    event = context["calendar_events"][conflict["event_index"]]
+    assert proposal.meeting_title == event["title"] == "Leadership Meeting"
+    assert proposal.priority == event["priority"] == "high"
+    assert proposal.meeting_id == "fixture:calendar_events[1]"
+    assert proposal.conflict_source == "selected_plan.calendar_conflicts[0]"
+    assert proposal.conflict_type == conflict["conflict_type"] == "DEPARTURE_BEFORE_OR_AT_EVENT_START"
+    assert proposal.penalty == conflict["penalty"] == -20.0
+    assert proposal.current_start == "2026-09-16T16:30:00"
+    assert proposal.current_end == "2026-09-16T17:00:00"
+    assert proposal.proposed_start == "2026-09-16T15:15:00"
+    assert proposal.proposed_end == "2026-09-16T15:45:00"
+    assert result["selected_plan"]["feasibility"]["feasible"]
+    assert "SOFT PENALTY" in render_demo(report)
+    assert "CALENDAR WRITE EXECUTED: NO" in render_demo(report)
+    assert "USER APPROVAL REQUIRED" in render_demo(report)
+    assert report["calendar_proposals"] == run_demo(traced=False)["calendar_proposals"]
+
+
+def test_cp3_states_are_fixed_and_no_mutation_api_exists():
+    proposal = run_demo()["calendar_proposals"][0]
+    assert CALENDAR_MUTATIONS_REQUIRE_EXPLICIT_APPROVAL is True
+    assert proposal.approval_required is True
+    assert proposal.approval_status == "AWAITING_USER_APPROVAL"
+    assert proposal.execution_status == "NOT_EXECUTED"
+    assert not {name for name, _ in inspect.getmembers(CalendarChangeProposal, inspect.isfunction)
+                if not name.startswith("_")}
+    for name, value in (("approval_required", False), ("approval_status", "APPROVED"),
+                        ("execution_status", "EXECUTED"), ("proposed_start", "changed")):
+        with pytest.raises(FrozenInstanceError):
+            setattr(proposal, name, value)
+    for name in ("approval_required", "approval_status", "execution_status"):
+        with pytest.raises((TypeError, ValueError), match="init=False"):
+            replace(proposal, **{name: "override"})
+
+
+def test_cp3_requires_real_conflict_and_suitable_demo_slot():
+    report = run_demo()
+    run = report["booked_result"]["run"]
+    context, result, scenario = run["context"], run["planning_result"], report["scenario"]
+    slots = scenario["calendar_proposal_slots"]
+    assert propose_calendar_changes(context, result, [], as_of=scenario["as_of"]) == ()
+    without_conflict = deepcopy(result)
+    without_conflict["selected_plan"]["calendar_conflicts"] = []
+    assert propose_calendar_changes(context, without_conflict, slots, as_of=scenario["as_of"]) == ()
+    assert propose_calendar_changes(context, {"selected_plan": None}, slots, as_of=scenario["as_of"]) == ()
+    for change in ({"meeting_title": "Other"}, {"allowed_start": "2026-09-16T14:15"},
+                   {"allowed_start": "2026-09-16T16:15", "allowed_end": "2026-09-16T16:45"},
+                   {"allowed_end": "2026-09-16T15:30"}):
+        invalid = [dict(slots[0], **change)]
+        assert propose_calendar_changes(context, result, invalid, as_of=scenario["as_of"]) == ()
+    mismatched = deepcopy(context)
+    mismatched["calendar_events"][1]["title"] = "Different event"
+    with pytest.raises(ValueError, match="Conflict does not match"):
+        propose_calendar_changes(mismatched, result, slots, as_of=scenario["as_of"])
+
+
+def test_cp3_never_imports_live_providers_or_model_sdks():
+    import builtins
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if (name.startswith("travel_agent.live") or name.split(".")[0] in
+                {"openai", "anthropic", "google", "langchain", "langgraph"}):
+            raise AssertionError(f"External provider/model import: {name}")
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=guarded_import):
+        report = run_demo()
+    assert report["calendar_proposals"][0].execution_status == "NOT_EXECUTED"
