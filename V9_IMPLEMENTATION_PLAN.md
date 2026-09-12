@@ -1,6 +1,51 @@
 # V9 implementation plan and continuation record
 
-## Current continuation checkpoint: Phase 5E-A Graph Mail contract review
+## Current continuation checkpoint: Phase 5E-B Graph Mail adapter (uncommitted)
+
+The user authorized the Phase 5E-A documentation freeze and then Phase 5E-B
+implementation on 2026-09-12. Phase 5E-A was committed as
+`9c7e4e13707745667ac5439b236b7ac1a915d1da` with message
+`V9 Phase 5E-A: freeze Microsoft Graph mail synchronization contract`.
+Only the approved two documentation files were committed; status was clean afterward.
+Branch remains `feature/v9-live-replanning`. Nothing was pushed.
+
+Conclusion: **A. PHASE 5E-B GRAPH MAIL ADAPTER APPROVED FOR COMMIT**.
+Phase 5E-B remains uncommitted and requires separate commit authorization.
+See [V9_PHASE_5E_B_GRAPH_MAIL_ADAPTER.md](V9_PHASE_5E_B_GRAPH_MAIL_ADAPTER.md)
+for architecture, exact runtime ports, supported scope, limits and validation.
+
+Added MicrosoftGraphHttpClient, OutlookMailSource, strict Graph normalization and
+offline client/source/persistence tests. Existing provider-neutral ports, mail
+fingerprint, retained membership, atomic synchronization/repository projection,
+FULL_RESYNC_REQUIRED, Gmail and template authority remain unchanged. Normal physical
+folder delta rounds use immutable message IDs and a bounded completed multi-folder
+cursor in existing TEXT storage; no migration or dependency was added.
+Mailbox-level move resolution changes visibility only, never flight cancellation.
+
+The HTTP client requires an injected deadline-capable GraphTransport and a trusted
+GraphCredentialProvider returning a verified own-mailbox session with exactly
+delegated Graph Mail.Read. No concrete network transport, identity-token verifier,
+OAuth login/refresh runtime or live account integration is installed in this slice.
+The runtime must prove absolute DNS/connect/header/read deadlines and authenticated
+session binding before live use; fake-port tests do not claim live conformance.
+This follows the frozen injected-transport/runtime boundary, without substituting
+an inactivity timeout for the absolute deadline requirement.
+
+Validation: Graph **193 passed**; existing mail/extraction/reconciliation/booking/
+repository/provider **145 passed + 23 subtests**; Gmail **130 passed**; template
+framework **42 passed**. Complete suite: **701 passed + 245 subtests in 45.74s**,
+no failures or skips. New fixtures are fabricated protocol responses and existing
+fictional Northstar evidence, never real airline messages or private mailbox data.
+Final whitespace/diff, secrets/PII, artifact, dependency and migration checks passed.
+All 62 V8 Python source/test files and all existing source/tests remain unchanged.
+
+Next recommended slice: separately review and validate host credential/transport
+integration before live Graph access. Phase 5D-B remains deferred pending sanitized,
+format-faithful actual airline messages. No calendar, worker, MCP, operational
+provider, airline parser, V8 activation or real-time replanning work has begun.
+Do not commit Phase 5E-B, push or begin calendar work in this slice.
+
+## Phase 5E-A contract review checkpoint (now frozen and committed)
 
 Review date 2026-09-12. Verified repository model_agnostic_travel_agent_v1,
 branch `feature/v9-live-replanning`, HEAD
@@ -8,9 +53,10 @@ branch `feature/v9-live-replanning`, HEAD
 Phase 5D-A is frozen and committed. Phase 5D-B real-airline validation remains
 deferred until sanitized, format-faithful actual evidence is supplied.
 
-Conclusion: **A. PHASE 5E-A GRAPH MAIL CONTRACT APPROVED FOR COMMIT**.
-Documentation/architecture review only; no Graph runtime implementation or commit
-is authorized by this conclusion. No source, tests, dependencies or migrations change.
+Review conclusion: **A. PHASE 5E-A GRAPH MAIL CONTRACT APPROVED FOR COMMIT**.
+The subsequent explicit user freeze authorization produced the commit above.
+The review itself was documentation-only: no source, tests, dependency or migration
+changes belonged to Phase 5E-A.
 Official Microsoft references, review date, documented behavior versus project
 inferences, and implementation gates are recorded in
 [V9_PHASE_5E_A_GRAPH_MAIL_CONTRACT.md](V9_PHASE_5E_A_GRAPH_MAIL_CONTRACT.md).
@@ -49,7 +95,8 @@ V8 source/tests and all frozen Gmail behavior remain unchanged.
 5E-B may be considered only after separate implementation authorization and the
 contract's offline tests/gates. No OAuth, Graph client/source, calendar, workers,
 MCP/HITL, operational providers or replanning implementation in 5E-A.
-Do not commit, push or begin 5E-B in this slice.
+Those review-only restrictions were superseded solely by the subsequent explicit
+freeze and Phase 5E-B implementation authorization recorded above.
 
 ## Phase 5D-A freeze checkpoint (committed)
 
