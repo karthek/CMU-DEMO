@@ -1,4 +1,4 @@
-"""CP6A recorded structured evidence over existing MCP; no direct fallback."""
+"""Recorded evidence or explicit live host file handoff over MCP; no fallback."""
 import argparse
 import asyncio
 import hashlib
@@ -34,12 +34,12 @@ def load_payload(path=None):
         raise EvidenceValidationError("Cannot load structured evidence JSON") from exc
 
 
-async def rehearse_evidence(payload=None, *, parameters=None):
+async def rehearse_evidence(payload=None, *, parameters=None, allow_live=False):
     scenario = json.loads((ROOT / "demo/scenario.json").read_text(encoding="utf-8"))
     evidence = parse_evidence(load_payload() if payload is None else payload)
-    # Source vocabulary supports future labeling; CP6A never claims live access.
-    if evidence.source_type != EvidenceSource.RECORDED:
-        raise EvidenceValidationError("CP6A rehearsal accepts RECORDED HOST EVIDENCE only; live use is not enabled")
+    # Live provenance requires an explicit handoff; the recorded default stays offline.
+    if evidence.source_type == EvidenceSource.LIVE and not allow_live:
+        raise EvidenceValidationError("Live evidence requires an explicit file handoff")
     validate_scenario_evidence(evidence, scenario)  # Before any MCP process starts.
     with TemporaryFile(mode="w+", encoding="utf-8") as diagnostics:
         async with asyncio.timeout(45), Client(stdio_client(parameters or server_parameters(), errlog=diagnostics)) as client:
@@ -65,14 +65,22 @@ async def rehearse_evidence(payload=None, *, parameters=None):
 def render_evidence(report):
     evidence = report["evidence"]
     selected, alternative = report["planning_result"]["finalists"]
-    return "\n".join(["=== HOST EVIDENCE ===", f"Source: [{evidence.source_label}]",
+    live = evidence.source_type == EvidenceSource.LIVE
+    return "\n".join(["=== LIVE HOST EVIDENCE HANDOFF ===" if live else "=== HOST EVIDENCE ===",
+        f"Source: [{evidence.source_label}]",
         f"Provider: {evidence.provider.value}", f"Flight: {evidence.flight_number}",
         f"Route: {evidence.departure_airport} -> {evidence.arrival_airport}",
         f"Scheduled departure: {evidence.scheduled_departure} ({evidence.time_basis})",
         f"Scheduled arrival: {evidence.scheduled_arrival or 'not supplied'} (retained evidence; not a planner input)",
         f"Evidence timestamp: {evidence.evidence_timestamp or 'not supplied'} ({evidence.time_basis})",
         "Validation: PASSED (structure and demo compatibility; not verified booking authenticity)",
-        "Gmail was NOT accessed. No LLM was called.",
+        "Gmail was NOT accessed by this local process. No LLM was called by this local process.",
+        "Explicit local file handoff; extraction occurs outside this repository."
+            if live else "Recorded synthetic evidence rehearsal.",
+        "This local stdio connection does not originate inside ChatGPT web.",
+        "HOST EVIDENCE VALIDATION: PASSED",
+        "MCP TRANSPORT: STDIO",
+        "DETERMINISTIC PLANNER: EXECUTED",
         "=== FIELD PROVENANCE [DEMO SIDECAR] ===",
         *[f"{field}: [{source}]" for field, source in report["provenance"].items()],
         "Candidates: [FIXTURE] rehearsed host-style proposals; not authoritative evaluations.",
@@ -90,10 +98,11 @@ def render_evidence(report):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--evidence", type=Path, help="Recorded structured booking JSON")
+    parser.add_argument("--evidence", type=Path, help="Recorded or live host structured booking JSON (explicit local handoff)")
     args = parser.parse_args(argv)
     try:
-        print(render_evidence(asyncio.run(rehearse_evidence(load_payload(args.evidence)))))
+        print(render_evidence(asyncio.run(rehearse_evidence(
+            load_payload(args.evidence), allow_live=args.evidence is not None))))
     except Exception as exc:
         # Do not echo email-derived content, paths, or exception groups.
         def invalid_evidence(error):

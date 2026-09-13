@@ -3,6 +3,7 @@ import asyncio
 from copy import deepcopy
 from dataclasses import FrozenInstanceError
 import inspect
+import json
 import os
 import socket
 import sys
@@ -97,7 +98,7 @@ def test_source_vocabulary_does_not_enable_live_rehearsal():
     assert evidence.source_label == "LIVE HOST EVIDENCE"
     assert evidence.provider.value == "GMAIL_VIA_HOST"
     validate_scenario_evidence(evidence, load_scenario())
-    # The pure contract supports labels; CP6A's execution path explicitly rejects live.
+    # The recorded default still rejects live input without explicit handoff.
     with pytest.raises(EvidenceValidationError):
         asyncio.run(bridge.rehearse_evidence(dict(bridge.load_payload(), source_type="LIVE_HOST_EVIDENCE")))
 
@@ -159,3 +160,76 @@ def test_evidence_host_does_not_import_service_or_planning_bypass():
     assert "TravelService" not in source.split("def render_evidence")[0]
     assert "from travel_agent" not in source
     assert "run_demo" not in source
+
+
+def synthetic_live_payload():
+    """Non-personal test data exercising host provenance, not a Gmail retrieval."""
+    return dict(bridge.load_payload(), source_type="LIVE_HOST_EVIDENCE", provider="GMAIL_VIA_HOST")
+
+
+@pytest.mark.parametrize("changes", [
+    {"unknown": "data"}, {"flight_number": "bad!"}, {"departure_airport": "A"},
+    {"arrival_airport": "P3L"}, {"departure_date": "2026-02-30"},
+    {"scheduled_departure": "bad"}, {"scheduled_arrival": "2026-09-16T18:00"},
+    {"flight_number": "DL999"}, {"time_basis": "UTC"},
+    {"score": 100}, {"feasibility": True}, {"recommendation": "16:00"},
+    {"calendar_penalty": 0}, {"proposed_meeting_time": "15:00"},
+    {"approval_status": "APPROVED"}, {"execution_status": "EXECUTED"},
+    {"finalists": []},
+    *[{field: None} for field in ("source_type", "provider", "flight_number", "departure_airport",
+        "arrival_airport", "departure_date", "scheduled_departure", "time_basis")],
+])
+def test_cp6b_invalid_external_file_fails_closed(tmp_path, capsys, changes):
+    payload = synthetic_live_payload()
+    payload.update(changes)
+    for field, value in changes.items():
+        if value is None:
+            del payload[field]
+    path = tmp_path / "synthetic-invalid.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with patch.object(bridge, "Client") as client, patch.object(
+            bridge, "parse_evidence", wraps=parse_evidence) as validator:
+        assert bridge.main(["--evidence", str(path)]) == 1
+        validator.assert_called_once_with(payload)
+        client.assert_not_called()
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "INVALID HOST EVIDENCE" in output.err and "no fallback" in output.err
+    local = Mock()
+    with pytest.raises(EvidenceValidationError):
+        rehearse_demo(mcp_runner=lambda: asyncio.run(bridge.rehearse_evidence(
+            bridge.load_payload(path), allow_live=True)), direct_runner=local)
+    local.assert_not_called()
+
+
+def test_cp6b_external_cli_real_mcp_parity(tmp_path, capsys):
+    path = tmp_path / "synthetic-live-handoff.json"
+    payload = synthetic_live_payload()
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    reports = []
+    original_render = bridge.render_evidence
+    def capture(report):
+        reports.append(report)
+        return original_render(report)
+    with patch.object(bridge, "parse_evidence", wraps=parse_evidence) as validator, \
+         patch.object(bridge, "render_evidence", side_effect=capture):
+        assert bridge.main(["--evidence", str(path)]) == 0
+        first = capsys.readouterr()
+        assert bridge.main(["--evidence", str(path)]) == 0
+        second = capsys.readouterr()
+        assert validator.call_count == 2
+        validator.assert_called_with(payload)
+    assert first == second and first.err == ""
+    assert reports[0] == reports[1]
+    recorded = asyncio.run(bridge.rehearse_evidence())
+    direct = run_demo()
+    assert reports[0]["planning_result"] == recorded["planning_result"] == direct["booked_result"]["run"]["planning_result"]
+    assert reports[0]["context"] == recorded["context"]
+    assert reports[0]["proposals"] == recorded["proposals"]
+    assert "=== LIVE HOST EVIDENCE HANDOFF ===" in first.out
+    assert "flight.departure_time: [LIVE HOST EVIDENCE]" in first.out
+    assert "calendar_events: [FIXTURE]" in first.out
+    for label in ("MCP TRANSPORT: STDIO", "DETERMINISTIC PLANNER: EXECUTED",
+                  "AWAITING_USER_APPROVAL", "NOT_EXECUTED", "CALENDAR WRITE EXECUTED: NO"):
+        assert label in first.out
+    assert path.read_text(encoding="utf-8") == json.dumps(payload)

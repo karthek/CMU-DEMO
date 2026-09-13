@@ -111,10 +111,38 @@ that evidence has been ingested. No V9 mail extraction/projection is invoked:
 those contracts require mail identity, template authority, and reconciliation
 evidence that this small host envelope does not claim to supply.
 
-Next CP6B (not implemented): ChatGPT or another host reads Gmail and supplies
-equivalent structured evidence through this adapter and existing MCP context
-boundary. The source vocabulary supports `[LIVE HOST EVIDENCE]` and
-`GMAIL_VIA_HOST`; CP6A's rehearsal rejects live mode. The deterministic agent
-requires neither Gmail credentials nor a specific LLM provider. Any different
-route/date/timezone or provenance-persistence requirement needs a separately
-reviewed extension; this checkpoint does not support arbitrary bookings.
+### CP6B: Live Host Evidence Handoff
+
+CP6A remains the Recorded Host Evidence Bridge. CP6B accepts an explicit external
+file using exactly the same contract and validators:
+
+```powershell
+.\.venv\Scripts\python.exe -B demo/host_evidence_demo.py --evidence <path>
+```
+
+For live host-derived data, use `source_type: "LIVE_HOST_EVIDENCE"` and
+`provider: "GMAIL_VIA_HOST"`. These are supplied provenance claims, not booking
+authentication. Do not relabel recorded evidence as live. Do not commit personal
+Gmail evidence files. Tests generate synthetic, non-personal payloads in temporary
+files to exercise these labels; they do not access Gmail.
+
+ChatGPT/Gmail extraction occurs outside this repository. The host emits
+provider-neutral structured evidence; the local demo validates it before MCP
+planning. This web-host demonstration uses an **explicit local file handoff**:
+ChatGPT web does not directly attach to the local stdio process. This is a
+deployment/transport boundary. A future deployment may use a remotely reachable
+MCP transport or another supported host connection without changing deterministic
+planning logic.
+
+Booking fields are labeled `[LIVE HOST EVIDENCE]`; supplemental assumptions remain
+`[FIXTURE]`. No email body or decision outputs are accepted. Validation failures
+stop before MCP starts, without recorded/fixture substitution or infrastructure
+fallback. The default command still uses the recorded CP6A payload.
+
+The fixed scenario bounds remain DL1425, ATL to PHL, September 16, 2026 at 19:00,
+with `America/New_York` time basis. An optional evidence timestamp cannot be later
+than the fixed noon scenario clock. A historical or otherwise incompatible real
+flight is rejected; CP6B proves handoff, not arbitrary booking support. The agent
+requires neither Gmail credentials nor a specific LLM provider. No network, model,
+calendar write, or approval execution is added. The proposed meeting slot remains
+demo input; attendee availability and organizer permission are not verified.
