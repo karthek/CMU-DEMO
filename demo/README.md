@@ -78,3 +78,43 @@ Focused failure-injection checks (no production sabotage):
 ```powershell
 .\.venv\Scripts\python.exe -B -m pytest -p no:cacheprovider tests/test_cmu_rehearsal.py -q
 ```
+
+## LIVE HOST ROADMAP
+
+Current CP6A: recorded, structured host evidence, with no Gmail or model access:
+
+```powershell
+.\.venv\Scripts\python.exe -B demo/host_evidence_demo.py
+.\.venv\Scripts\python.exe -B demo/host_evidence_demo.py --evidence demo/recorded_host_evidence.json
+```
+
+The demo envelope requires `source_type`, `provider`, `flight_number`,
+`departure_airport`, `arrival_airport`, `departure_date`, `scheduled_departure`,
+and `time_basis`. Optional `scheduled_arrival` and `evidence_timestamp` are retained
+as evidence, not planner inputs. All timestamps use the explicitly declared
+`America/New_York` basis in this bounded ATL/PHL demo. No personal identifiers,
+confirmation number, email body, sender address, or model prose are collected.
+
+The bridge uses production identifier/date/context validators, checks the exact
+supported scenario, obtains supplemental context via `get_trip_context`, then
+maps evidence fields into `evaluate_trip_plans.context`. Calendar, boarding, gate,
+status, delay, and duration assumptions remain visibly `[FIXTURE]`. Booking flight,
+route, and departure are `[RECORDED HOST EVIDENCE]`. Unknown fields, including
+attempted scores/feasibility/approval overrides, are rejected. Invalid evidence
+does not trigger CP5 infrastructure fallback; this rehearsal has no fallback.
+
+Provenance is a demo sidecar, not a production MCP response field or authenticated
+provider assertion. `evaluate_trip_plans` validates structure and evaluates
+caller-supplied facts; it does not establish booking truth. `plan_booked_trip`
+selects existing repository bookings and is deliberately not used to pretend
+that evidence has been ingested. No V9 mail extraction/projection is invoked:
+those contracts require mail identity, template authority, and reconciliation
+evidence that this small host envelope does not claim to supply.
+
+Next CP6B (not implemented): ChatGPT or another host reads Gmail and supplies
+equivalent structured evidence through this adapter and existing MCP context
+boundary. The source vocabulary supports `[LIVE HOST EVIDENCE]` and
+`GMAIL_VIA_HOST`; CP6A's rehearsal rejects live mode. The deterministic agent
+requires neither Gmail credentials nor a specific LLM provider. Any different
+route/date/timezone or provenance-persistence requirement needs a separately
+reviewed extension; this checkpoint does not support arbitrary bookings.
