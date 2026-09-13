@@ -69,8 +69,8 @@ def rehearse_demo(*, mode="mcp", fallback=True, mcp_runner=None, direct_runner=N
 def too_late_demo():
     """Rehearse the existing CP2 18:00 duplicate test through the real service."""
     report = run_demo(candidates=[
-        {"label": "Late", "leave_time": "2026-09-16T18:00", "summary": "Too late"},
-        {"label": "Duplicate", "leave_time": "2026-09-16T18:00:00", "summary": "Same instant"}])
+        {"label": "Late", "leave_time": "2026-09-29T18:00", "summary": "Too late"},
+        {"label": "Duplicate", "leave_time": "2026-09-29T18:00:00", "summary": "Same instant"}])
     result = report["booked_result"]["run"]["planning_result"]
     if result["status"] != "NO_FEASIBLE_PLAN" or result["selected_plan"] is not None:
         raise AuthoritativeFailure("Too-late rehearsal did not return the expected NO_FEASIBLE_PLAN")
@@ -98,12 +98,13 @@ def render_rehearsal(rehearsal):
                   "Reason: " + (rehearsal["reason"] or "Presenter selected offline mode."),
                   "Fallback: ENABLED | Source: LOCAL DETERMINISTIC FIXTURE PATH",
                   "Fallback changes the integration path, not the planning logic."]
-    lines += ["=== 1. BOOKED TRIP [FIXTURE] ==="]
+    lines += ["=== 1. BOOKED TRIP [RECORDED HOST FLIGHT; BOOKING STATUS FIXTURE] ==="]
     for booking in report["scenario"]["itineraries"]["records"]:
         for segment in booking["segments"]:
             lines.append(f"{booking['itinerary_id']}: {segment['flight_number']} {segment['origin']} -> "
                          f"{segment['destination']} | {segment['scheduled_departure']} | {segment['booking_status']}")
-    lines += ["=== 2. CONTEXT [FIXTURE] ===",
+    from demo.composition import render_domains
+    lines += [render_domains(report["evidence"], result), "=== 2. CALENDAR CONTEXT [FIXTURE] ===",
               f"Travel {context['airport_travel_minutes']} + security {context['security_minutes']} + "
               f"gate walk {context['gate_walk_minutes']} minutes; parking is not added."]
     lines += [f"{e['title']}: {e['start']} to {e['end']} ({e['priority']})" for e in context["calendar_events"]]

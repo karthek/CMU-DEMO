@@ -29,9 +29,10 @@ EXPECTED_TOOLS = {"get_trip_context", "evaluate_trip_plans", "monitor_trips", "p
 SCHEMA_DIGEST = "ae6a91f831baada793a01035f14fa639cffd036c1d197966ef3a9ec33c3e96ac"
 
 
-def server_parameters():
+def server_parameters(evidence_directory=None):
     return StdioServerParameters(command=sys.executable,
-        args=["-B", "-m", "demo.mcp_demo_server"], cwd=str(ROOT))
+        args=["-B", "-m", "demo.mcp_demo_server"] +
+             (["--evidence-directory", str(evidence_directory)] if evidence_directory is not None else []), cwd=str(ROOT))
 
 
 async def checked_call(client, tools, name, arguments):

@@ -1,0 +1,19 @@
+{
+  "benefit_type": "AIRPORT_LOUNGE",
+  "airport": "PHL",
+  "eligible": true,
+  "usable_from": "2026-09-29T15:00",
+  "usable_until": "2026-09-29T18:00",
+  "time_basis": "America/New_York",
+  "facility_name": "Chase Sapphire Lounge by The Club",
+  "facility_location": "Terminal D/E Connector",
+  "amenities": [
+    "FOOD",
+    "WORKSPACE",
+    "RELAXATION"
+  ],
+  "source_type": "RECORDED_HOST_TRAVEL_BENEFIT_EVIDENCE",
+  "source_reference": "https://www.chase.com/sapphire-cards/lounges",
+  "provenance_label": "Host lookup; user reports Sapphire Reserve; access credentials/boarding pass required",
+  "retrieved_on": "2026-09-13"
+}

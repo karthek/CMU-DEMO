@@ -1,0 +1,13 @@
+{
+  "origin_type": "USER_SUPPLIED_LOCATION",
+  "origin": "301 N Walnut St, Wilmington, DE",
+  "destination": "PHL",
+  "travel_mode": "DRIVE",
+  "distance_miles": 21.7,
+  "estimated_travel_minutes": 33,
+  "travel_date": "2026-09-29",
+  "time_basis": "America/New_York",
+  "source_type": "RECORDED_HOST_TRAVEL_EVIDENCE",
+  "source_reference": "https://www.loopnet.com/property/301-n-walnut-st-wilmington-de-19801/10003-2604320025/",
+  "retrieved_on": "2026-09-13"
+}

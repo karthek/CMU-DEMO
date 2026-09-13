@@ -29,7 +29,7 @@ class EvidenceProvider(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class HostBookingEvidence:
+class FlightEvidence:
     source_type: EvidenceSource
     provider: EvidenceProvider
     flight_number: str
@@ -77,7 +77,7 @@ def parse_evidence(payload):
         raise EvidenceValidationError("Missing or unsupported evidence fields; decisions and instructions are not accepted")
     if any(not isinstance(payload[k], str) for k in required):
         raise EvidenceValidationError("Required evidence fields must be structured strings")
-    return HostBookingEvidence(**payload)
+    return FlightEvidence(**payload)
 
 
 def validate_scenario_evidence(evidence, scenario):

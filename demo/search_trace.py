@@ -66,7 +66,7 @@ def stage_rows(stage, previous_beam=()):
 
 def render_trace(stages, width, depth, finalists):
     lines = ["=== BEAM SEARCH TRACE ===", f"Width: {width}", f"Depth: {depth}",
-             "Host proposes. Production Beam Search / feasibility / Critic evaluate.",
+             "Host proposes. Production Beam Search / feasibility evaluate; production Critic plus demo-local benefit utility.",
              "Depth counts initial selection plus refinement stages; feasibility is separate from beam retention."]
     previous = []
     for stage in stages:

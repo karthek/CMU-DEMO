@@ -20,8 +20,8 @@ from demo.hitl import (CalendarChangeProposal, propose_calendar_changes,
 
 def test_scenario_contains_proposals_and_evidence_only():
     scenario = load_scenario()
-    assert scenario["itineraries"]["records"][0]["segments"][0]["origin"] == "ATL"
-    assert scenario["as_of"] == "2026-09-16T12:00:00"
+    assert scenario["itineraries"]["records"][0]["segments"][0]["origin"] == "PHL"
+    assert scenario["as_of"] == "2026-09-29T12:00:00"
     forbidden = {"score", "score_breakdown", "feasibility", "selected_plan", "finalists"}
 
     def check(value):
@@ -86,15 +86,15 @@ def test_no_calendar_write_surface_and_truthful_presentation():
     assert "Calendar conflicts are soft scoring penalties" in output
     assert "No calendar mutation or approval/execution workflow" in output
     context = report["booked_result"]["run"]["context"]
-    assert (context["airport_travel_minutes"], context["security_minutes"], context["gate_walk_minutes"]) == (45, 20, 15)
+    assert (context["airport_travel_minutes"], context["security_minutes"], context["gate_walk_minutes"]) == (33, 20, 15)
 
 
 def test_trace_parity_and_actual_stages():
     traced, plain = run_demo(), run_demo(traced=False)
     assert traced["booked_result"] == plain["booked_result"]
     result = traced["booked_result"]["run"]["planning_result"]
-    assert [p["leave_time"][-5:] for p in result["finalists"]] == ["16:20", "16:10"]
-    assert [p["score"] for p in result["finalists"]] == [76.8, 76.0]
+    assert [p["leave_time"][-5:] for p in result["finalists"]] == ["15:30", "15:20"]
+    assert [p["score"] for p in result["finalists"]] == [97.6, 96.8]
     assert [s["stage"] for s in traced["trace"]] == [1, 2, 3]
     assert [len(s["entered"]) for s in traced["trace"]] == [3, 6, 6]
     assert traced["trace"][0]["entered"] == [dict(p, history=[]) for p in load_scenario()["candidates"]]
@@ -137,8 +137,8 @@ def test_observer_detached_cannot_change_rank_output_or_inputs():
 def test_infeasible_search_beam_and_duplicate_semantics():
     report = run_demo(traced=False)
     context = context_from_dict(report["booked_result"]["run"]["context"])
-    candidates = [{"label": "Late", "leave_time": "2026-09-16T18:00", "summary": "Too late"},
-                  {"label": "Duplicate", "leave_time": "2026-09-16T18:00:00", "summary": "Same instant"}]
+    candidates = [{"label": "Late", "leave_time": "2026-09-29T18:00", "summary": "Too late"},
+                  {"label": "Duplicate", "leave_time": "2026-09-29T18:00:00", "summary": "Same instant"}]
     planner = TracedBeamSearchPlanner()
     result = planner.search_outcome(context, candidates)
     assert result == BeamSearchPlanner().search_outcome(context, candidates)
@@ -179,10 +179,10 @@ def test_cp3_proposal_uses_authoritative_conflict_without_mutation():
     assert proposal.conflict_source == "selected_plan.calendar_conflicts[0]"
     assert proposal.conflict_type == conflict["conflict_type"] == "DEPARTURE_BEFORE_OR_AT_EVENT_START"
     assert proposal.penalty == conflict["penalty"] == -20.0
-    assert proposal.current_start == "2026-09-16T16:30:00"
-    assert proposal.current_end == "2026-09-16T17:00:00"
-    assert proposal.proposed_start == "2026-09-16T15:15:00"
-    assert proposal.proposed_end == "2026-09-16T15:45:00"
+    assert proposal.current_start == "2026-09-29T16:00:00"
+    assert proposal.current_end == "2026-09-29T16:30:00"
+    assert proposal.proposed_start == "2026-09-29T14:15:00"
+    assert proposal.proposed_end == "2026-09-29T14:45:00"
     assert result["selected_plan"]["feasibility"]["feasible"]
     assert "SOFT PENALTY" in render_demo(report)
     assert "CALENDAR WRITE EXECUTED: NO" in render_demo(report)
@@ -217,9 +217,9 @@ def test_cp3_requires_real_conflict_and_suitable_demo_slot():
     without_conflict["selected_plan"]["calendar_conflicts"] = []
     assert propose_calendar_changes(context, without_conflict, slots, as_of=scenario["as_of"]) == ()
     assert propose_calendar_changes(context, {"selected_plan": None}, slots, as_of=scenario["as_of"]) == ()
-    for change in ({"meeting_title": "Other"}, {"allowed_start": "2026-09-16T14:15"},
-                   {"allowed_start": "2026-09-16T16:15", "allowed_end": "2026-09-16T16:45"},
-                   {"allowed_end": "2026-09-16T15:30"}):
+    for change in ({"meeting_title": "Other"}, {"allowed_start": "2026-09-29T13:15"},
+                   {"allowed_start": "2026-09-29T16:15", "allowed_end": "2026-09-29T16:45"},
+                   {"allowed_end": "2026-09-29T14:30"}):
         invalid = [dict(slots[0], **change)]
         assert propose_calendar_changes(context, result, invalid, as_of=scenario["as_of"]) == ()
     mismatched = deepcopy(context)

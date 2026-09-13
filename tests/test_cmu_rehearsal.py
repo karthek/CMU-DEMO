@@ -35,8 +35,8 @@ def test_mcp_first_and_full_parity():
     assert "MODE: MCP / LOCAL STDIO" in text
     assert "Status: CONNECTED" in text
     assert "parity-checked LOCAL production execution replay" in text
-    assert "Leave: 16:20 | Score: 76.80" in text
-    assert "Alternative: 16:10 / 76.00" in text
+    assert "Leave: 15:30 | Score: 97.60" in text
+    assert "Alternative: 15:20 / 96.80" in text
 
 
 def test_infrastructure_fallback_uses_real_direct_path_and_sanitizes_reason():
@@ -149,8 +149,8 @@ def test_two_real_mcp_rehearsals_and_governance():
     validate_baseline(direct["booked_result"]["run"]["planning_result"])
     assert (direct["beam_width"], direct["depth"]) == (2, 3)
     proposal = direct["calendar_proposals"][0]
-    assert proposal.proposed_start == "2026-09-16T15:15:00"
-    assert proposal.proposed_end == "2026-09-16T15:45:00"
+    assert proposal.proposed_start == "2026-09-29T14:15:00"
+    assert proposal.proposed_end == "2026-09-29T14:45:00"
     assert proposal.approval_status == "AWAITING_USER_APPROVAL"
     assert proposal.execution_status == "NOT_EXECUTED"
     assert first["demo"] == launcher.rehearse_demo(mode="offline")["demo"]

@@ -12,15 +12,17 @@ from travel_agent.composition import create_itinerary_service
 from travel_agent.itinerary.clock import FixedClock, TIME_BASIS, parse_local
 from demo.search_trace import TracedBeamSearchPlanner, render_trace
 from demo.hitl import propose_calendar_changes, render_hitl
+from demo.composition import load_demo_evidence, configure_demo_service, render_domains
 
 
 def load_scenario(path=None):
     return json.loads(Path(path or Path(__file__).with_name("scenario.json")).read_text(encoding="utf-8"))
 
 
-def run_demo(*, traced=True, candidates=None):
+def run_demo(*, traced=True, candidates=None, evidence_directory=None):
     """Return real service evidence/results; all persistence is temporary."""
     scenario = load_scenario()
+    evidence = load_demo_evidence(scenario, evidence_directory)
     if candidates is not None:
         # Demo rehearsal input override only; production service still validates.
         from copy import deepcopy
@@ -36,6 +38,7 @@ def run_demo(*, traced=True, candidates=None):
             clock=FixedClock(parse_local(scenario["as_of"])),
         )
         try:
+            configure_demo_service(service, scenario, evidence)
             planner = service.travel_service.coordinator.planner
             if traced:
                 planner = TracedBeamSearchPlanner(beam_width=planner.beam_width, depth=planner.depth,
@@ -47,7 +50,7 @@ def run_demo(*, traced=True, candidates=None):
             proposals = propose_calendar_changes(
                 result["run"]["context"], result["run"]["planning_result"],
                 scenario.get("calendar_proposal_slots", []), as_of=scenario["as_of"])
-            return {"scenario": scenario, "booked_result": result,
+            return {"scenario": scenario, "evidence": evidence, "booked_result": result,
                     "beam_width": planner.beam_width, "depth": planner.depth,
                     "calendar_proposals": proposals,
                     "trace": planner.stages if traced else []}
@@ -65,7 +68,7 @@ def render_demo(report):
     lines = ["=== CMU TRAVEL AGENT DEMO ===", "", "MODE",
              "Offline fixture mode: no network, Gmail, Google Calendar, or LLM.",
              f"Fixed scenario clock [FIXTURE]: {scenario['as_of']} ({TIME_BASIS})",
-             "", "USER GOAL", scenario["user_goal"], "", "BOOKED TRIP [FIXTURE]"]
+             "", "USER GOAL", scenario["user_goal"], "", "BOOKED TRIP [RECORDED HOST FLIGHT; BOOKING STATUS FIXTURE]"]
     for record in scenario["itineraries"]["records"]:
         for segment in record["segments"]:
             lines.append(f"{record['itinerary_id']} / {segment['segment_id']}: "
@@ -74,11 +77,11 @@ def render_demo(report):
     lines += ["", "CALENDAR CONTEXT [FIXTURE]"]
     for event in context["calendar_events"]:
         lines.append(f"{event['title']}: {event['start']} to {event['end']} ({event['priority']})")
-    lines += ["", "AGENT INPUTS [FIXTURE]",
+    lines += ["", "AGENT INPUTS [MIXED SOURCES]",
               f"Flight: {flight['flight_number']}; departure {flight['departure_time']}; "
               f"boarding {flight['boarding_time']}; gate {flight['gate']}; {flight['status']}",
-              "Calendar: existing CalendarAgent reads FakeCalendarTool workday events.",
-              f"Transport: {context['airport_travel_minutes']} minutes driving to ATL (FakeTransportTool).",
+              "Calendar: existing CalendarAgent reads demo-local fixture workday events.",
+              f"Transport: {context['airport_travel_minutes']} minutes driving to {flight['origin']} (host evidence via TransportAgent).",
               f"Timing used by core: travel {context['airport_travel_minutes']} + "
               f"security {context['security_minutes']} + gate walk {context['gate_walk_minutes']} minutes.",
               f"Preferred boarding buffer (soft score): {context['preferred_buffer_minutes']} minutes.",
@@ -108,12 +111,12 @@ def render_demo(report):
     if report["calendar_proposals"]:
         lines += ["", render_hitl(report["calendar_proposals"])]
     lines += ["", "BOUNDARIES / ASSUMPTIONS",
-              "All trip, calendar, and transport evidence is FIXTURE data; local times use America/New_York.",
+              "Flight/transport/benefit are RECORDED HOST EVIDENCE; calendar/security/gate timing remain FIXTURE.",
               "Gate feasibility is relative to configured timing assumptions, not proof of real-world arrival.",
               "Calendar conflicts are soft scoring penalties, not hard gate infeasibility.",
               "Parking and terminal-walking components are not added to the production timing calculation.",
               "No calendar mutation or approval/execution workflow is available in this demo.",
-              "Lounge / grab-and-go behavior is a later demo enhancement; no lounge optimization is performed.",
+              render_domains(report["evidence"], result),
               "Runtime state is isolated in a temporary directory and removed after each run."]
     return "\n".join(lines)
 
